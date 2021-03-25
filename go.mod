@@ -1,4 +1,4 @@
-module github.com/xyz-li/openpitrix-job
+module kubesphere.io/openpitrix-jobs
 
 go 1.15
 

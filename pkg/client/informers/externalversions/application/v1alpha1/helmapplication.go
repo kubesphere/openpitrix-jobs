@@ -22,14 +22,14 @@ import (
 	"context"
 	time "time"
 
-	applicationv1alpha1 "github.com/xyz-li/openpitrix-job/pkg/apis/application/v1alpha1"
-	versioned "github.com/xyz-li/openpitrix-job/pkg/client/clientset/versioned"
-	internalinterfaces "github.com/xyz-li/openpitrix-job/pkg/client/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/xyz-li/openpitrix-job/pkg/client/listers/application/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
+	applicationv1alpha1 "kubesphere.io/openpitrix-jobs/pkg/apis/application/v1alpha1"
+	versioned "kubesphere.io/openpitrix-jobs/pkg/client/clientset/versioned"
+	internalinterfaces "kubesphere.io/openpitrix-jobs/pkg/client/informers/externalversions/internalinterfaces"
+	v1alpha1 "kubesphere.io/openpitrix-jobs/pkg/client/listers/application/v1alpha1"
 )
 
 // HelmApplicationInformer provides access to a shared informer and lister for

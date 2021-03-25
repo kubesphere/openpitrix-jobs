@@ -23,13 +23,13 @@ import (
 	sync "sync"
 	time "time"
 
-	versioned "github.com/xyz-li/openpitrix-job/pkg/client/clientset/versioned"
-	application "github.com/xyz-li/openpitrix-job/pkg/client/informers/externalversions/application"
-	internalinterfaces "github.com/xyz-li/openpitrix-job/pkg/client/informers/externalversions/internalinterfaces"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
+	versioned "kubesphere.io/openpitrix-jobs/pkg/client/clientset/versioned"
+	application "kubesphere.io/openpitrix-jobs/pkg/client/informers/externalversions/application"
+	internalinterfaces "kubesphere.io/openpitrix-jobs/pkg/client/informers/externalversions/internalinterfaces"
 )
 
 // SharedInformerOption defines the functional option type for SharedInformerFactory.

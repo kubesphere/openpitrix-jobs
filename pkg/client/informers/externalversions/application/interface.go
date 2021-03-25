@@ -19,8 +19,8 @@ limitations under the License.
 package application
 
 import (
-	v1alpha1 "github.com/xyz-li/openpitrix-job/pkg/client/informers/externalversions/application/v1alpha1"
-	internalinterfaces "github.com/xyz-li/openpitrix-job/pkg/client/informers/externalversions/internalinterfaces"
+	v1alpha1 "kubesphere.io/openpitrix-jobs/pkg/client/informers/externalversions/application/v1alpha1"
+	internalinterfaces "kubesphere.io/openpitrix-jobs/pkg/client/informers/externalversions/internalinterfaces"
 )
 
 // Interface provides access to each of this group's versions.

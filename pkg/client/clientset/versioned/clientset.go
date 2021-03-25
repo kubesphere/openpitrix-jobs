@@ -21,10 +21,10 @@ package versioned
 import (
 	"fmt"
 
-	applicationv1alpha1 "github.com/xyz-li/openpitrix-job/pkg/client/clientset/versioned/typed/application/v1alpha1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
+	applicationv1alpha1 "kubesphere.io/openpitrix-jobs/pkg/client/clientset/versioned/typed/application/v1alpha1"
 )
 
 type Interface interface {

@@ -2,10 +2,10 @@ package main
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/xyz-li/openpitrix-job/pkg/client/clientset/versioned"
 	"io"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
+	"kubesphere.io/openpitrix-jobs/pkg/client/clientset/versioned"
 )
 
 var kubeconfig string
@@ -23,7 +23,7 @@ func newRootCmd(out io.Writer, args []string) (*cobra.Command, error) {
 		if err != nil {
 			klog.Fatalf("load kubeconfig failed, error: %s", err)
 		}
-		appClient, err =  versioned.NewForConfig(config)
+		appClient, err = versioned.NewForConfig(config)
 		if err != nil {
 			klog.Fatalf("build config failed, error: %s", err)
 		}
