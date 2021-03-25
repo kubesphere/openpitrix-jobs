@@ -174,6 +174,9 @@ func (wf *ImportWorkFlow) CreateApp(ctx context.Context, chrt *chart.Chart) (app
 			Labels: map[string]string{
 				builtinKey: "true",
 			},
+			Annotations: map[string]string{
+				constants.CreatorAnnotationKey: "admin",
+			},
 		},
 		Spec: v1alpha1.HelmApplicationSpec{
 			Name:        chrt.Name(),
@@ -234,6 +237,9 @@ func (wf *ImportWorkFlow) CreateAppVer(ctx context.Context, app *v1alpha1.HelmAp
 				Name: appId,
 				Labels: map[string]string{
 					constants.ChartApplicationIdLabelKey: app.Name,
+				},
+				Annotations: map[string]string{
+					constants.CreatorAnnotationKey: "admin",
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
