@@ -19,9 +19,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/xyz-li/openpitrix-job/pkg/apis/application/v1alpha1"
-	"github.com/xyz-li/openpitrix-job/pkg/client/clientset/versioned/scheme"
 	rest "k8s.io/client-go/rest"
+	v1alpha1 "kubesphere.io/openpitrix-jobs/pkg/apis/application/v1alpha1"
+	"kubesphere.io/openpitrix-jobs/pkg/client/clientset/versioned/scheme"
 )
 
 type ApplicationV1alpha1Interface interface {

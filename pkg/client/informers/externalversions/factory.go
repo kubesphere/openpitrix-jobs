@@ -23,13 +23,14 @@ import (
 	sync "sync"
 	time "time"
 
-	versioned "github.com/xyz-li/openpitrix-job/pkg/client/clientset/versioned"
-	application "github.com/xyz-li/openpitrix-job/pkg/client/informers/externalversions/application"
-	internalinterfaces "github.com/xyz-li/openpitrix-job/pkg/client/informers/externalversions/internalinterfaces"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
+	versioned "kubesphere.io/openpitrix-jobs/pkg/client/clientset/versioned"
+	application "kubesphere.io/openpitrix-jobs/pkg/client/informers/externalversions/application"
+	cluster "kubesphere.io/openpitrix-jobs/pkg/client/informers/externalversions/cluster"
+	internalinterfaces "kubesphere.io/openpitrix-jobs/pkg/client/informers/externalversions/internalinterfaces"
 )
 
 // SharedInformerOption defines the functional option type for SharedInformerFactory.
@@ -173,8 +174,13 @@ type SharedInformerFactory interface {
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
 	Application() application.Interface
+	Cluster() cluster.Interface
 }
 
 func (f *sharedInformerFactory) Application() application.Interface {
 	return application.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Cluster() cluster.Interface {
+	return cluster.New(f, f.namespace, f.tweakListOptions)
 }

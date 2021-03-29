@@ -17,9 +17,9 @@ limitations under the License.
 package crdinstall
 
 import (
-	"github.com/xyz-li/openpitrix-job/pkg/apis/application/v1alpha1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	urlruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"kubesphere.io/openpitrix-jobs/pkg/apis/application/v1alpha1"
 )
 
 func Install(scheme *k8sruntime.Scheme) {

@@ -5,17 +5,17 @@ import (
 	"context"
 	"errors"
 	"github.com/spf13/cobra"
-	v1alpha1 "github.com/xyz-li/openpitrix-job/pkg/apis/application/v1alpha1"
-	typedv1alpha1 "github.com/xyz-li/openpitrix-job/pkg/client/clientset/versioned/typed/application/v1alpha1"
-	"github.com/xyz-li/openpitrix-job/pkg/constants"
-	"github.com/xyz-li/openpitrix-job/pkg/idutils"
-	"github.com/xyz-li/openpitrix-job/pkg/s3"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"io/ioutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
+	v1alpha1 "kubesphere.io/openpitrix-jobs/pkg/apis/application/v1alpha1"
+	typedv1alpha1 "kubesphere.io/openpitrix-jobs/pkg/client/clientset/versioned/typed/application/v1alpha1"
+	"kubesphere.io/openpitrix-jobs/pkg/constants"
+	"kubesphere.io/openpitrix-jobs/pkg/idutils"
+	"kubesphere.io/openpitrix-jobs/pkg/s3"
 	"net/http"
 	"strings"
 )
@@ -37,7 +37,7 @@ func newImportCmd() *cobra.Command {
 
 			}
 			wf := &ImportWorkFlow{
-				client:   appClient.ApplicationV1alpha1(),
+				client:   versionedClient.ApplicationV1alpha1(),
 				s3Cleint: s3Client,
 			}
 
@@ -101,8 +101,6 @@ func newImportCmd() *cobra.Command {
 	f.StringVar(&chartListUrl, "chart-list-url",
 		"https://raw.githubusercontent.com/openpitrix/helm-package-repository/master/package/urls.txt",
 		"chart list which will be imported into kubesphere's app store")
-
-	s3Options.AddFlags(f, s3Options)
 
 	return cmd
 }
@@ -174,6 +172,9 @@ func (wf *ImportWorkFlow) CreateApp(ctx context.Context, chrt *chart.Chart) (app
 			Labels: map[string]string{
 				builtinKey: "true",
 			},
+			Annotations: map[string]string{
+				constants.CreatorAnnotationKey: "admin",
+			},
 		},
 		Spec: v1alpha1.HelmApplicationSpec{
 			Name:        chrt.Name(),
@@ -234,6 +235,9 @@ func (wf *ImportWorkFlow) CreateAppVer(ctx context.Context, app *v1alpha1.HelmAp
 				Name: appId,
 				Labels: map[string]string{
 					constants.ChartApplicationIdLabelKey: app.Name,
+				},
+				Annotations: map[string]string{
+					constants.CreatorAnnotationKey: "admin",
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{

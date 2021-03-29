@@ -18,8 +18,8 @@ package v1alpha1
 
 import (
 	"fmt"
-	"github.com/xyz-li/openpitrix-job/pkg/constants"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"kubesphere.io/openpitrix-jobs/pkg/constants"
 	"strings"
 )
 

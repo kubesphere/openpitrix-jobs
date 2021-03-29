@@ -17,7 +17,7 @@ limitations under the License.
 package apis
 
 import (
-	"github.com/xyz-li/openpitrix-job/pkg/apis/application/v1alpha1"
+	"kubesphere.io/openpitrix-jobs/pkg/apis/application/v1alpha1"
 )
 
 func init() {
