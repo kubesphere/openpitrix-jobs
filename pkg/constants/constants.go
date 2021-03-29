@@ -17,13 +17,13 @@ limitations under the License.
 package constants
 
 const (
-
 	ClusterNameLabelKey               = "kubesphere.io/cluster"
 	WorkspaceLabelKey                 = "kubesphere.io/workspace"
 	NamespaceLabelKey                 = "kubesphere.io/namespace"
 	ChartRepoIdLabelKey               = "application.kubesphere.io/repo-id"
 	ChartApplicationIdLabelKey        = "application.kubesphere.io/app-id"
+	ChartApplicationVersionIdLabelKey = "application.kubesphere.io/app-version-id"
 	CategoryIdLabelKey                = "application.kubesphere.io/app-category-id"
 	CreatorAnnotationKey              = "kubesphere.io/creator"
+	KubeSphereNamespace               = "kubesphere-system"
 )
-

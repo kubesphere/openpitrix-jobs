@@ -22,7 +22,6 @@ import (
 	"github.com/sony/sonyflake"
 	"github.com/speps/go-hashids"
 	"net"
-
 )
 
 var sf *sonyflake.Sonyflake
@@ -46,7 +45,6 @@ func GetIntId() uint64 {
 	}
 	return id
 }
-
 
 const Alphabet36 = "abcdefghijklmnopqrstuvwxyz1234567890"
 

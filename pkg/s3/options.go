@@ -46,7 +46,6 @@ func NewS3Options() *Options {
 	}
 }
 
-
 // AddFlags add options flags to command line flags,
 // if s3-endpoint if left empty, following options will be ignored
 func (s *Options) AddFlags(fs *pflag.FlagSet, c *Options) {

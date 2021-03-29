@@ -37,7 +37,7 @@ func newImportCmd() *cobra.Command {
 
 			}
 			wf := &ImportWorkFlow{
-				client:   appClient.ApplicationV1alpha1(),
+				client:   versionedClient.ApplicationV1alpha1(),
 				s3Cleint: s3Client,
 			}
 
@@ -101,8 +101,6 @@ func newImportCmd() *cobra.Command {
 	f.StringVar(&chartListUrl, "chart-list-url",
 		"https://raw.githubusercontent.com/openpitrix/helm-package-repository/master/package/urls.txt",
 		"chart list which will be imported into kubesphere's app store")
-
-	s3Options.AddFlags(f, s3Options)
 
 	return cmd
 }

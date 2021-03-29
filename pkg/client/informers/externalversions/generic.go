@@ -24,6 +24,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 	v1alpha1 "kubesphere.io/openpitrix-jobs/pkg/apis/application/v1alpha1"
+	clusterv1alpha1 "kubesphere.io/openpitrix-jobs/pkg/apis/cluster/v1alpha1"
 )
 
 // GenericInformer is type of SharedIndexInformer which will locate and delegate to other
@@ -63,6 +64,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Application().V1alpha1().HelmReleases().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("helmrepos"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Application().V1alpha1().HelmRepos().Informer()}, nil
+
+		// Group=cluster.kubesphere.io, Version=v1alpha1
+	case clusterv1alpha1.SchemeGroupVersion.WithResource("clusters"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Cluster().V1alpha1().Clusters().Informer()}, nil
 
 	}
 

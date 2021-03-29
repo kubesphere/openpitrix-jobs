@@ -14,15 +14,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package crdinstall
-
-import (
-	k8sruntime "k8s.io/apimachinery/pkg/runtime"
-	urlruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"kubesphere.io/openpitrix-jobs/pkg/apis/application/v1alpha1"
-)
-
-func Install(scheme *k8sruntime.Scheme) {
-	urlruntime.Must(v1alpha1.AddToScheme(scheme))
-	urlruntime.Must(scheme.SetVersionPriority(v1alpha1.SchemeGroupVersion))
-}
+package cluster
