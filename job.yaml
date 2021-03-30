@@ -1,0 +1,30 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    app: openpitrix
+    component: openpitrix-upgrade-job
+  name: openpitrix-upgrade-job
+  namespace: kubesphere-system
+spec:
+  template:
+    metadata:
+      labels:
+        app: openpitrix
+        component: openpitrix-upgrade-job
+    spec:
+      serviceAccountName: kubesphere
+      restartPolicy: Never
+      containers:
+        - name: upgrade
+          command:
+            - start-jobs
+          image: 139.198.9.238:30002/library/openpitrix-jobs
+          imagePullPolicy: Always
+          volumeMounts:
+            - mountPath: /etc/kubesphere
+              name: kubesphere-config
+      volumes:
+        - name: kubesphere-config
+          configMap:
+            name: kubesphere-config

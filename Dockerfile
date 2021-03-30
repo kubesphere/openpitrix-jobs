@@ -8,17 +8,17 @@ COPY . .
 
 RUN mkdir -p /release_bin
 RUN CGO_ENABLED=0 GOBIN=/release_bin go install -mod=vendor -ldflags '-w -s'  kubesphere.io/openpitrix-jobs/cmd/import-app/...
+RUN CGO_ENABLED=0 GOBIN=/release_bin go install -mod=vendor -ldflags '-w -s'  kubesphere.io/openpitrix-jobs/cmd/start-jobs/...
 
-RUN cd package && for pkg in $(cat urls.txt); do curl -O $pkg; done
+FROM 139.198.9.238:30002/library/dump-all as dump
+#FROM openpitrix/dump-all:latest as dump
 
-FROM kubesphere/kubectl:v1.19.0
+FROM alpine:3.7
+RUN apk add --update ca-certificates && update-ca-certificates
 
-ARG HELM_VERSION=v3.5.2
-ARG KUSTOMIZE_VERSION=v4.0.5
+WORKDIR /root
+COPY urls.txt /root
+RUN mkdir -p package && cp urls.txt package  && cd /root/package && for pkg in $(cat urls.txt); do wget $pkg; done
 
-# install helm
-RUN wget https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz && \
-    tar xvf helm-${HELM_VERSION}-linux-amd64.tar.gz && \
-    rm helm-${HELM_VERSION}-linux-amd64.tar.gz && \
-    mv linux-amd64/helm /usr/bin/ && \
-    rm -rf linux-amd64
+COPY --from=dump /usr/local/bin/dump-all /usr/local/bin
+COPY --from=builder /release_bin/* /usr/local/bin/
