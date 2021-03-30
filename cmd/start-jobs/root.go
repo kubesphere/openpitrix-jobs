@@ -3,16 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/spf13/cobra"
 	"io"
+	"os/exec"
+	"strings"
+
+	"github.com/spf13/cobra"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 	"kubesphere.io/openpitrix-jobs/cmd/start-jobs/types"
-	"os/exec"
-	"strings"
 )
 
 const (
@@ -33,6 +34,11 @@ func newRootCmd(out io.Writer, args []string) (*cobra.Command, error) {
 			config, err := types.TryLoadFromDisk()
 			if err != nil {
 				klog.Fatalf("load config failed, error: %s", err)
+			}
+
+			if config.OpenPitrixOptions == nil || config.OpenPitrixOptions.S3Options.Endpoint == "" {
+				klog.Infof("openpitrix s3 config is empty")
+				return
 			}
 
 			_, err = k8sClient.AppsV1().Deployments(openpitrixNamespace).Get(context.TODO(), openpitrixDeploy, metav1.GetOptions{})
