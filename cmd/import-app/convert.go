@@ -30,16 +30,8 @@ import (
 	"time"
 )
 
-type ksConfig struct {
-	MultiCluster multiClusterOptions `yaml:"multicluster"`
-}
-type multiClusterOptions struct {
-	// Enable
-	Enable bool `yaml:"enable"`
-}
-
 var (
-	kubesphereConfig      = "kubesphere-config"
+	multiClusterEnabled   = false
 	legacyDir             string
 	nullChar              = "\u0000"
 	legacyCreator         = "system"
@@ -72,21 +64,7 @@ func newConvertCmd() *cobra.Command {
 				k8sClient: k8sClient,
 				legacyDir: legacyDir,
 			}
-
-			configMap, err := cw.k8sClient.CoreV1().ConfigMaps(constants.KubeSphereNamespace).Get(context.TODO(), kubesphereConfig, metav1.GetOptions{})
-			if err != nil {
-				klog.Fatalf("get config map failed, error: %s", err)
-			} else {
-				content := configMap.Data["kubesphere.yaml"]
-
-				var kc ksConfig
-				err := yaml.Unmarshal([]byte(content), &kc)
-				if err != nil {
-					klog.Fatalf("json unmarshal kubesphere-config failed, error: %s", err)
-				}
-
-				cw.multiClusterEnabled = kc.MultiCluster.Enable
-			}
+			cw.multiClusterEnabled = multiClusterEnabled
 
 			// 1. load legacy data
 			err = cw.LoadAllData()
@@ -127,6 +105,8 @@ func newConvertCmd() *cobra.Command {
 	f.StringVar(&legacyDir, "legacy-dir",
 		"/tmp/op-dump",
 		"dir of legacy openpitrix data")
+
+	f.BoolVar(&multiClusterEnabled, "multi-cluster-enable", false, "multi cluster enable or not")
 
 	s3Options.AddFlags(f, s3Options)
 

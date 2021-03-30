@@ -13,47 +13,18 @@ spec:
         app: openpitrix
         component: openpitrix-upgrade-job
     spec:
+      serviceAccountName: kubesphere
       restartPolicy: Never
       containers:
         - name: upgrade
           command:
-            - /root/start.sh
-            -  --s3-access-key-id=openpitrixminioaccesskey
-            -  --s3-bucket=app
-            -  --s3-endpoint=http://minio.kubesphere-system:9000
-            -  --s3-secret-access-key=openpitrixminiosecretkey
+            - start-jobs
           image: 139.198.9.238:30002/library/openpitrix-jobs
           imagePullPolicy: Always
           volumeMounts:
-            - mountPath: /tmp/op-dump
-              name: dump-dir
-#      volumes:
-#        - name: config-volume
-#          configMap:
-#            name: dump-config
-      initContainers:
-        - command: ["dump-all"]
-          env:
-            - name: OPENPITRIX_GRPC_SHOW_ERROR_CAUSE
-              value: "true"
-            - name: OPENPITRIX_LOG_LEVEL
-              value: debug
-            - name: OPENPITRIX_ETCD_ENDPOINTS
-              value: etcd.kubesphere-system.svc:2379
-            - name: OPENPITRIX_MYSQL_HOST
-              value: mysql.kubesphere-system.svc
-            - name: OPENPITRIX_ATTACHMENT_ENDPOINT
-              value: http://minio.kubesphere-system.svc:9000
-            - name: OPENPITRIX_ATTACHMENT_BUCKET_NAME
-              value: openpitrix-attachment
-            - name: OPENPITRIX_MYSQL_PASSWORD
-              value: password
-          image: openpitrix/dump-all:latest
-          imagePullPolicy: Always
-          name: dump-all
-          volumeMounts:
-            - mountPath: /tmp/op-dump
-              name: dump-dir
+            - mountPath: /etc/kubesphere
+              name: kubesphere-config
       volumes:
-        - name: dump-dir
-          emptyDir: {}
+        - name: kubesphere-config
+          configMap:
+            name: kubesphere-config
