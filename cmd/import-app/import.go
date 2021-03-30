@@ -1,13 +1,11 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
-	"io/ioutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
@@ -16,18 +14,17 @@ import (
 	"kubesphere.io/openpitrix-jobs/pkg/constants"
 	"kubesphere.io/openpitrix-jobs/pkg/idutils"
 	"kubesphere.io/openpitrix-jobs/pkg/s3"
-	"net/http"
-	"strings"
+	"os"
+	"path"
 )
 
 var builtinKey = "application.kubesphere.io/builtin-app"
-var chartListUrl string
+var chartDir string
 var (
 	InvalidScheme = errors.New("invalid scheme")
 )
 
 func newImportCmd() *cobra.Command {
-	s3Options := s3.NewS3Options()
 	cmd := &cobra.Command{
 		Use:   "import",
 		Short: "import app",
@@ -41,53 +38,33 @@ func newImportCmd() *cobra.Command {
 				s3Cleint: s3Client,
 			}
 
-			if chartListUrl == "" {
-				klog.Fatalf(" --chart-list-url is empty")
-			}
-
-			resp, err := http.Get(chartListUrl)
+			file, err := os.Open(chartDir)
 			if err != nil {
-				klog.Fatalf("get chart list content failed, error: %s", err)
+				klog.Fatalf("failed opening directory: %s, error: %s", chartDir, err)
 			}
+			defer file.Close()
 
-			data, err := ioutil.ReadAll(resp.Body)
+			fileList, err := file.Readdir(0)
 			if err != nil {
-				klog.Fatalf("read chart list content failed, error: %s", err)
+				klog.Fatalf("read dir failed, error: %s", err)
 			}
 
-			lines := string(data)
-			for _, line := range strings.Split(lines, "\n") {
-				line := strings.TrimSpace(line)
-				if line == "" {
+			for _, fileInfo := range fileList {
+				if fileInfo.IsDir() {
 					continue
 				}
-				chartName, chartVer, err := parseChartNameVer(line)
-				if err != nil {
-					klog.Fatalf("parse chart name and version failed, %s", line)
-				} else {
-					klog.Infof("download chart: %s, version: %s, from: %s", chartName, chartVer, line)
-				}
 
-				resp, err = http.Get(line)
-				if err != nil {
-					klog.Fatalf("download chart failed, error: %s", err)
-				}
-
-				chartData, err := ioutil.ReadAll(resp.Body)
-				if err != nil {
-					klog.Fatalf("load chart data failed failed, error: %s", err)
-				}
-				chrt, err := loader.LoadArchive(bytes.NewBuffer(chartData))
+				chrt, err := loader.LoadFile(path.Join(chartDir, fileInfo.Name()))
 				if err != nil {
 					klog.Fatalf("load chart data failed failed, error: %s", err)
 				}
 
 				app, err := wf.CreateApp(context.TODO(), chrt)
 				if err != nil {
-					klog.Fatalf("create chart %s failed, error: %s", chartName, err)
+					klog.Fatalf("create chart %s failed, error: %s", chrt.Name(), err)
 				}
 
-				appVer, err := wf.CreateAppVer(context.TODO(), app, chrt, chartData)
+				appVer, err := wf.CreateAppVer(context.TODO(), app, path.Join(chartDir, fileInfo.Name()))
 				if err != nil {
 					klog.Errorf("create app version failed, error: %s", err)
 				}
@@ -98,38 +75,11 @@ func newImportCmd() *cobra.Command {
 
 	f := cmd.Flags()
 
-	f.StringVar(&chartListUrl, "chart-list-url",
-		"https://raw.githubusercontent.com/openpitrix/helm-package-repository/master/package/urls.txt",
-		"chart list which will be imported into kubesphere's app store")
+	f.StringVar(&chartDir, "chart-dir",
+		"/root/package",
+		"the dir to which charts are saved")
 
 	return cmd
-}
-
-func parseChartNameVer(line string) (name, ver string, err error) {
-	slashInd := strings.LastIndex(line, "/")
-	if slashInd == -1 {
-		return "", "", InvalidScheme
-	}
-
-	leftParts := line[slashInd+1:]
-	dashInd := strings.LastIndex(leftParts, "-")
-	if dashInd == -1 || dashInd == 0 {
-		return "", "", InvalidScheme
-	}
-
-	// got name
-	name = leftParts[:dashInd]
-
-	leftParts = leftParts[dashInd+1:]
-	dotInd := strings.LastIndex(leftParts, ".")
-	if dotInd == -1 || dotInd == 0 {
-		return "", "", InvalidScheme
-	}
-
-	// got version
-	ver = leftParts[:dotInd]
-
-	return
 }
 
 type ImportWorkFlow struct {
@@ -141,7 +91,7 @@ var _ importInterface = &ImportWorkFlow{}
 
 type importInterface interface {
 	CreateApp(ctx context.Context, chrt *chart.Chart) (*v1alpha1.HelmApplication, error)
-	CreateAppVer(ctx context.Context, app *v1alpha1.HelmApplication, chrt *chart.Chart, chartData []byte) (*v1alpha1.HelmApplicationVersion, error)
+	CreateAppVer(ctx context.Context, app *v1alpha1.HelmApplication, chartFileName string) (*v1alpha1.HelmApplicationVersion, error)
 	UpdateAppVersionStatus(ctx context.Context, appVer *v1alpha1.HelmApplicationVersion) (*v1alpha1.HelmApplicationVersion, error)
 }
 
@@ -186,9 +136,16 @@ func (wf *ImportWorkFlow) CreateApp(ctx context.Context, chrt *chart.Chart) (app
 	return wf.client.HelmApplications().Create(ctx, app, metav1.CreateOptions{})
 }
 
-func (wf *ImportWorkFlow) CreateAppVer(ctx context.Context, app *v1alpha1.HelmApplication, chrt *chart.Chart, chartData []byte) (*v1alpha1.HelmApplicationVersion, error) {
-	chartName := chrt.Name()
-	chartVer := chrt.Metadata.Version
+func (wf *ImportWorkFlow) CreateAppVer(ctx context.Context, app *v1alpha1.HelmApplication, chartFileName string) (*v1alpha1.HelmApplicationVersion, error) {
+
+	chrt, err := loader.LoadFile(chartFileName)
+
+	if err != nil {
+		klog.Fatalf("load chart data failed failed, error: %s", err)
+		return nil, err
+	}
+
+	chartFile, _ := os.Open(chartFileName)
 
 	appVerList, err := wf.client.HelmApplicationVersions().List(ctx, metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(map[string]string{constants.ChartApplicationIdLabelKey: app.Name}).String(),
@@ -203,7 +160,7 @@ func (wf *ImportWorkFlow) CreateAppVer(ctx context.Context, app *v1alpha1.HelmAp
 
 	for ind := range appVerList.Items {
 		existsAppVer = &appVerList.Items[ind]
-		if existsAppVer.GetChartVersion() == chartVer {
+		if existsAppVer.GetChartVersion() == chrt.Metadata.Version {
 			klog.Infof("helm application version exists, id: %s", existsAppVer.Name)
 			if existsAppVer.Spec.DataKey == "" && existsAppVer.Status.State == v1alpha1.StateActive {
 				return existsAppVer, nil
@@ -222,7 +179,7 @@ func (wf *ImportWorkFlow) CreateAppVer(ctx context.Context, app *v1alpha1.HelmAp
 
 	// upload chart data
 	if existsAppVer == nil || existsAppVer.Spec.DataKey == "" {
-		err = wf.s3Cleint.Upload(appId, appId, bytes.NewBuffer(chartData))
+		err = wf.s3Cleint.Upload(path.Join(app.GetWorkspace(), appId), appId, chartFile)
 		if err != nil {
 			return nil, err
 		}
@@ -250,8 +207,8 @@ func (wf *ImportWorkFlow) CreateAppVer(ctx context.Context, app *v1alpha1.HelmAp
 			},
 			Spec: v1alpha1.HelmApplicationVersionSpec{
 				Metadata: &v1alpha1.Metadata{
-					Name:       chartName,
-					Version:    chartVer,
+					Name:       chrt.Name(),
+					Version:    chrt.Metadata.Version,
 					AppVersion: chrt.Metadata.AppVersion,
 				},
 				DataKey: appId,
@@ -287,8 +244,9 @@ func (wf *ImportWorkFlow) UpdateAppVersionStatus(ctx context.Context, appVer *v1
 		name := appVer.Name
 		appVer, err = wf.client.HelmApplicationVersions().UpdateStatus(ctx, appVer, metav1.UpdateOptions{})
 		if err != nil {
-			klog.Errorf("update app version status failed, error: %s", err)
+			klog.Errorf("update app version %s status failed, retry: %d, error: %s", name, retry, err)
 		} else {
+			klog.Errorf("update app version %s status success", name)
 			return appVer, nil
 		}
 		appVer, err = wf.client.HelmApplicationVersions().Get(ctx, name, metav1.GetOptions{})
