@@ -11,6 +11,7 @@ import (
 )
 
 var kubeconfig string
+var master string
 var versionedClient *versioned.Clientset
 var k8sClient *kubernetes.Clientset
 var s3Options *s3.Options
@@ -24,7 +25,7 @@ func newRootCmd(out io.Writer, args []string) (*cobra.Command, error) {
 	}
 
 	cobra.OnInitialize(func() {
-		config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+		config, err := clientcmd.BuildConfigFromFlags(master, kubeconfig)
 		if err != nil {
 			klog.Fatalf("load kubeconfig failed, error: %s", err)
 		}
@@ -39,6 +40,7 @@ func newRootCmd(out io.Writer, args []string) (*cobra.Command, error) {
 
 	addKlogFlags(flags)
 	flags.StringVar(&kubeconfig, "kubeconfig", "", "path to the kubeconfig file")
+	flags.StringVar(&master, "master", "", "kubernetes master")
 
 	s3Options.AddFlags(flags, s3Options)
 	flags.Parse(args)
