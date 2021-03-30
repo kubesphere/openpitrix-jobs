@@ -3,7 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	services3 "github.com/aws/aws-sdk-go/service/s3"
 	"io"
+	"kubesphere.io/openpitrix-jobs/pkg/s3"
 	"os/exec"
 	"strings"
 
@@ -24,6 +30,7 @@ const (
 )
 
 var kubeconfig string
+var master string
 var k8sClient *kubernetes.Clientset
 
 func newRootCmd(out io.Writer, args []string) (*cobra.Command, error) {
@@ -36,9 +43,14 @@ func newRootCmd(out io.Writer, args []string) (*cobra.Command, error) {
 				klog.Fatalf("load config failed, error: %s", err)
 			}
 
-			if config.OpenPitrixOptions == nil || config.OpenPitrixOptions.S3Options.Endpoint == "" {
+			if config.OpenPitrixOptions == nil || config.OpenPitrixOptions.S3Options == nil || config.OpenPitrixOptions.S3Options.Endpoint == "" {
 				klog.Infof("openpitrix s3 config is empty")
 				return
+			}
+
+			err = createBucket(config.OpenPitrixOptions.S3Options)
+			if err != nil {
+				klog.Fatalf("create bucket error: %s", err)
 			}
 
 			_, err = k8sClient.AppsV1().Deployments(openpitrixNamespace).Get(context.TODO(), openpitrixDeploy, metav1.GetOptions{})
@@ -58,7 +70,9 @@ func newRootCmd(out io.Writer, args []string) (*cobra.Command, error) {
 					cmd.Args = make([]string, 0, 10)
 					cmd.Args = append(cmd.Args, importAppPath, "import")
 					cmd.Args = appendS3Param(cmd.Args, config)
-
+					if master != "" {
+						cmd.Args = append(cmd.Args, fmt.Sprintf("--master=%s", master))
+					}
 					err = cmd.Run()
 
 					if err != nil {
@@ -69,6 +83,12 @@ func newRootCmd(out io.Writer, args []string) (*cobra.Command, error) {
 			} else {
 				// openpitrix-hyperpitrix-deployment deploy exists, convert legacy app to k8s crd
 				// 1. dump legacy data
+				if config.MySql == nil {
+					config.MySql = &types.MySqlOptions{
+						Host:     "mysql.kubesphere-system.svc:3306",
+						Password: "password",
+					}
+				}
 				hostAndPort := strings.Split(config.MySql.Host, ":")
 				klog.Infof("start to dump legacy data")
 				cmd := exec.Cmd{
@@ -80,7 +100,7 @@ func newRootCmd(out io.Writer, args []string) (*cobra.Command, error) {
 						"OPENPITRIX_LOG_LEVEL=debug",
 						"OPENPITRIX_ETCD_ENDPOINTS=etcd.kubesphere-system.svc:2379",
 						fmt.Sprintf("OPENPITRIX_MYSQL_HOST=%s", hostAndPort[0]),
-						fmt.Sprintf("OPENPITRIX_ATTACHMENT_ENDPOINT=%s", config.S3Options.Endpoint),
+						fmt.Sprintf("OPENPITRIX_ATTACHMENT_ENDPOINT=%s", config.OpenPitrixOptions.S3Options.Endpoint),
 						"OPENPITRIX_ATTACHMENT_BUCKET_NAME=openpitrix-attachment",
 						fmt.Sprintf("OPENPITRIX_MYSQL_PASSWORD=%s", config.MySql.Password),
 					},
@@ -106,6 +126,9 @@ func newRootCmd(out io.Writer, args []string) (*cobra.Command, error) {
 				if config.MultiClusterOptions != nil {
 					cmd.Args = append(cmd.Args, fmt.Sprintf("--multi-cluster-enable=%t", config.MultiClusterOptions.Enable))
 				}
+				if master != "" {
+					cmd.Args = append(cmd.Args, fmt.Sprintf("--master=%s", master))
+				}
 
 				klog.Infof("run cmd: %s", cmd.String())
 				err = cmd.Run()
@@ -120,7 +143,7 @@ func newRootCmd(out io.Writer, args []string) (*cobra.Command, error) {
 	}
 
 	cobra.OnInitialize(func() {
-		config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+		config, err := clientcmd.BuildConfigFromFlags(master, kubeconfig)
 		if err != nil {
 			klog.Fatalf("load kubeconfig failed, error: %s", err)
 		}
@@ -132,10 +155,40 @@ func newRootCmd(out io.Writer, args []string) (*cobra.Command, error) {
 
 	addKlogFlags(flags)
 	flags.StringVar(&kubeconfig, "kubeconfig", "", "path to the kubeconfig file")
+	flags.StringVar(&master, "master", "", "kubernetes master")
 
 	flags.Parse(args)
 
 	return cmd, nil
+}
+
+func createBucket(s3config *s3.Options) error {
+	cred := credentials.NewStaticCredentials(s3config.AccessKeyID, s3config.SecretAccessKey, s3config.SessionToken)
+
+	config := aws.Config{
+		Region:           aws.String(s3config.Region),
+		Endpoint:         aws.String(s3config.Endpoint),
+		DisableSSL:       aws.Bool(s3config.DisableSSL),
+		S3ForcePathStyle: aws.Bool(s3config.ForcePathStyle),
+		Credentials:      cred,
+	}
+
+	s, err := session.NewSession(&config)
+	if err != nil {
+		klog.Error(err)
+		return err
+	}
+
+	svc := services3.New(s, &config)
+	_, err = svc.CreateBucket(&services3.CreateBucketInput{Bucket: aws.String(s3config.Bucket)})
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok && aerr.Code() != services3.ErrCodeBucketAlreadyOwnedByYou {
+			klog.Error(err)
+			return err
+		}
+	}
+
+	return nil
 }
 
 func appendS3Param(args []string, config *types.Config) []string {
