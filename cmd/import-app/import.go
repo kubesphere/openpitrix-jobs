@@ -233,7 +233,7 @@ func (wf *ImportWorkFlow) UpdateAppVersionStatus(ctx context.Context, appVer *v1
 
 	retry := 5
 	var err error
-	for ; retry >= 0; retry-- {
+	for i := 0; i < retry; i++ {
 		appVer.Status.State = v1alpha1.StateActive
 		appVer.Status.Audit = append(appVer.Status.Audit, v1alpha1.Audit{
 			State:    v1alpha1.StateActive,
@@ -244,7 +244,7 @@ func (wf *ImportWorkFlow) UpdateAppVersionStatus(ctx context.Context, appVer *v1
 		name := appVer.Name
 		appVer, err = wf.client.HelmApplicationVersions().UpdateStatus(ctx, appVer, metav1.UpdateOptions{})
 		if err != nil {
-			klog.Errorf("update app version %s status failed, retry: %d, error: %s", name, retry, err)
+			klog.Errorf("update app version %s status failed, retry: %d, error: %s", name, i, err)
 		} else {
 			klog.Errorf("update app version %s status success", name)
 			return appVer, nil

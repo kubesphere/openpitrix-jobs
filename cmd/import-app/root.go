@@ -8,6 +8,7 @@ import (
 	"k8s.io/klog/v2"
 	"kubesphere.io/openpitrix-jobs/pkg/client/clientset/versioned"
 	"kubesphere.io/openpitrix-jobs/pkg/s3"
+	"kubesphere.io/openpitrix-jobs/pkg/types"
 )
 
 var kubeconfig string
@@ -25,6 +26,14 @@ func newRootCmd(out io.Writer, args []string) (*cobra.Command, error) {
 	}
 
 	cobra.OnInitialize(func() {
+
+		ksConfig, err := types.TryLoadFromDisk()
+		if err != nil {
+			klog.Fatalf("load config failed, error: %s", err)
+		}
+
+		s3Options = ksConfig.OpenPitrixOptions.S3Options
+
 		config, err := clientcmd.BuildConfigFromFlags(master, kubeconfig)
 		if err != nil {
 			klog.Fatalf("load kubeconfig failed, error: %s", err)
@@ -42,9 +51,7 @@ func newRootCmd(out io.Writer, args []string) (*cobra.Command, error) {
 	flags.StringVar(&kubeconfig, "kubeconfig", "", "path to the kubeconfig file")
 	flags.StringVar(&master, "master", "", "kubernetes master")
 
-	s3Options.AddFlags(flags, s3Options)
 	flags.Parse(args)
-	// Add subcommands
 	cmd.AddCommand(
 		newImportCmd(),
 		newConvertCmd(),

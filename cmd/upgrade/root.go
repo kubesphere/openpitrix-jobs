@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -10,16 +9,14 @@ import (
 	services3 "github.com/aws/aws-sdk-go/service/s3"
 	"io"
 	"kubesphere.io/openpitrix-jobs/pkg/s3"
+	"kubesphere.io/openpitrix-jobs/pkg/types"
 	"os/exec"
 	"strings"
 
 	"github.com/spf13/cobra"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
-	"kubesphere.io/openpitrix-jobs/cmd/start-jobs/types"
 )
 
 const (
@@ -35,8 +32,8 @@ var k8sClient *kubernetes.Clientset
 
 func newRootCmd(out io.Writer, args []string) (*cobra.Command, error) {
 	cmd := &cobra.Command{
-		Use:   "start-app",
-		Short: "parse kubesphere-config then start dump-all and import-app",
+		Use:   "upgrade",
+		Short: "parse kubesphere-config then start dump-all and convert app",
 		Run: func(cmd *cobra.Command, args []string) {
 			config, err := types.TryLoadFromDisk()
 			if err != nil {
@@ -53,91 +50,59 @@ func newRootCmd(out io.Writer, args []string) (*cobra.Command, error) {
 				klog.Fatalf("create bucket error: %s", err)
 			}
 
-			_, err = k8sClient.AppsV1().Deployments(openpitrixNamespace).Get(context.TODO(), openpitrixDeploy, metav1.GetOptions{})
-			if err != nil {
-				if !apierrors.IsNotFound(err) {
-					klog.Fatalf("get openpitrix deploy failed, error: %s", err)
-				} else {
-					// import app
-					klog.Infof("start to import app")
-
-					cmd := exec.Cmd{
-						Path:   importAppPath,
-						Stdout: out,
-						Stderr: out,
-					}
-
-					cmd.Args = make([]string, 0, 10)
-					cmd.Args = append(cmd.Args, importAppPath, "import")
-					cmd.Args = appendS3Param(cmd.Args, config)
-					if master != "" {
-						cmd.Args = append(cmd.Args, fmt.Sprintf("--master=%s", master))
-					}
-					err = cmd.Run()
-
-					if err != nil {
-						klog.Fatalf("run import app failed, error: %s", err)
-					}
-					klog.Infof("import app ends")
-				}
-			} else {
-				// openpitrix-hyperpitrix-deployment deploy exists, convert legacy app to k8s crd
-				// 1. dump legacy data
-				if config.MySql == nil {
-					config.MySql = &types.MySqlOptions{
-						Host:     "mysql.kubesphere-system.svc:3306",
-						Password: "password",
-					}
-				}
-				hostAndPort := strings.Split(config.MySql.Host, ":")
-				klog.Infof("start to dump legacy data")
-				cmd := exec.Cmd{
-					Path:   dumpAllPath,
-					Stdout: out,
-					Stderr: out,
-					Env: []string{
-						"OPENPITRIX_GRPC_SHOW_ERROR_CAUSE=true",
-						"OPENPITRIX_LOG_LEVEL=debug",
-						"OPENPITRIX_ETCD_ENDPOINTS=etcd.kubesphere-system.svc:2379",
-						fmt.Sprintf("OPENPITRIX_MYSQL_HOST=%s", hostAndPort[0]),
-						fmt.Sprintf("OPENPITRIX_ATTACHMENT_ENDPOINT=%s", config.OpenPitrixOptions.S3Options.Endpoint),
-						"OPENPITRIX_ATTACHMENT_BUCKET_NAME=openpitrix-attachment",
-						fmt.Sprintf("OPENPITRIX_MYSQL_PASSWORD=%s", config.MySql.Password),
-					},
-				}
-				cmd.Args = make([]string, 0, 10)
-
-				err = cmd.Run()
-				if err != nil {
-					klog.Fatalf("run import app failed, error: %s", err)
-				}
-				klog.Infof("dump legacy data end")
-
-				// 2. convert legacy data to k8s crd
-				klog.Infof("start to convert legacy data to k8s crd")
-				cmd = exec.Cmd{
-					Path:   importAppPath,
-					Stdout: out,
-					Stderr: out,
-				}
-				cmd.Args = make([]string, 0, 10)
-				cmd.Args = append(cmd.Args, importAppPath, "convert")
-				cmd.Args = appendS3Param(cmd.Args, config)
-				if config.MultiClusterOptions != nil {
-					cmd.Args = append(cmd.Args, fmt.Sprintf("--multi-cluster-enable=%t", config.MultiClusterOptions.Enable))
-				}
-				if master != "" {
-					cmd.Args = append(cmd.Args, fmt.Sprintf("--master=%s", master))
-				}
-
-				klog.Infof("run cmd: %s", cmd.String())
-				err = cmd.Run()
-
-				if err != nil {
-					klog.Fatalf("convert legacy data to k8s crd failed, error: %s", err)
-				}
-				klog.Infof("convert legacy data to k8s crd end")
+			if config.MySql == nil {
+				klog.Fatalf("mysql is empty", err)
 			}
+
+			// 1. dump legacy data
+			hostAndPort := strings.Split(config.MySql.Host, ":")
+			klog.Infof("start to dump legacy data")
+			runCmd := exec.Cmd{
+				Path:   dumpAllPath,
+				Stdout: out,
+				Stderr: out,
+				Env: []string{
+					"OPENPITRIX_GRPC_SHOW_ERROR_CAUSE=true",
+					"OPENPITRIX_LOG_LEVEL=debug",
+					"OPENPITRIX_ETCD_ENDPOINTS=etcd.kubesphere-system.svc:2379",
+					fmt.Sprintf("OPENPITRIX_MYSQL_HOST=%s", hostAndPort[0]),
+					fmt.Sprintf("OPENPITRIX_ATTACHMENT_ENDPOINT=%s", config.OpenPitrixOptions.S3Options.Endpoint),
+					"OPENPITRIX_ATTACHMENT_BUCKET_NAME=openpitrix-attachment",
+					fmt.Sprintf("OPENPITRIX_MYSQL_PASSWORD=%s", config.MySql.Password),
+				},
+			}
+			runCmd.Args = make([]string, 0, 10)
+
+			err = runCmd.Run()
+			if err != nil {
+				klog.Fatalf("run import app failed, error: %s", err)
+			}
+			klog.Infof("dump legacy data end")
+
+			// 2. convert legacy data to k8s crd
+			klog.Infof("start to convert legacy data to k8s crd")
+			runCmd = exec.Cmd{
+				Path:   importAppPath,
+				Stdout: out,
+				Stderr: out,
+			}
+			runCmd.Args = make([]string, 0, 10)
+			runCmd.Args = append(runCmd.Args, importAppPath, "convert")
+
+			if config.MultiClusterOptions != nil {
+				runCmd.Args = append(runCmd.Args, fmt.Sprintf("--multi-cluster-enable=%t", config.MultiClusterOptions.Enable))
+			}
+			if master != "" {
+				runCmd.Args = append(runCmd.Args, fmt.Sprintf("--master=%s", master))
+			}
+
+			klog.Infof("run cmd: %s", runCmd.String())
+			err = runCmd.Run()
+
+			if err != nil {
+				klog.Fatalf("convert legacy data to k8s crd failed, error: %s", err)
+			}
+			klog.Infof("convert legacy data to k8s crd end")
 
 		},
 	}

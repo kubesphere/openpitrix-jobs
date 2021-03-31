@@ -14,7 +14,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
-	"kubesphere.io/openpitrix-jobs/cmd/import-app/types"
 	"kubesphere.io/openpitrix-jobs/pkg/apis/application/v1alpha1"
 	clusterv1alpha1 "kubesphere.io/openpitrix-jobs/pkg/apis/cluster/v1alpha1"
 	applicationv1alpha1 "kubesphere.io/openpitrix-jobs/pkg/client/clientset/versioned/typed/application/v1alpha1"
@@ -23,6 +22,7 @@ import (
 	"kubesphere.io/openpitrix-jobs/pkg/idutils"
 	legacy_op "kubesphere.io/openpitrix-jobs/pkg/legacy-op"
 	"kubesphere.io/openpitrix-jobs/pkg/s3"
+	"kubesphere.io/openpitrix-jobs/pkg/types"
 	"os"
 	"path"
 	"sigs.k8s.io/yaml"
@@ -46,7 +46,6 @@ var (
 )
 
 func newConvertCmd() *cobra.Command {
-	s3Options := s3.NewS3Options()
 	cmd := &cobra.Command{
 		Use:   "convert",
 		Short: "convert legacy OpenPitrix data to crd data",
@@ -107,8 +106,6 @@ func newConvertCmd() *cobra.Command {
 		"dir of legacy openpitrix data")
 
 	f.BoolVar(&multiClusterEnabled, "multi-cluster-enable", false, "multi cluster enable or not")
-
-	s3Options.AddFlags(f, s3Options)
 
 	return cmd
 }
@@ -472,7 +469,7 @@ func (cw *ConvertWorkflow) updateAppVerStatus(ctx context.Context, newVerName st
 			if !apierrors.IsConflict(err) {
 				return err
 			} else {
-				klog.Infof("update app version %s conflict, retry: %d", newVerName, retry)
+				klog.Infof("update app version %s conflict, retry: %d", newVerName, i)
 				time.Sleep(1 * time.Second)
 			}
 		} else {
