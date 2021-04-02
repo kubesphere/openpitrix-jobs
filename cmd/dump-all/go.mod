@@ -1,4 +1,4 @@
-module kubesphere.io/openpitrix-jobs/dump-all
+module kubesphere.io/openpitrix-jobs/cmd/dump-all
 
 go 1.16
 

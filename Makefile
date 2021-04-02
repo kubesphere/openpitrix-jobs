@@ -4,7 +4,8 @@
 
 # Run go fmt against code
 fmt:
-	gofmt -w ./pkg ./cmd
+	go fmt ./...
+	cd cmd/dump-all && go fmt ./...
 
 # Run go vet against code
 vet:
