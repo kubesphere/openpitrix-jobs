@@ -401,6 +401,7 @@ func (cw *ConvertWorkflow) createApp(ctx context.Context, oldApp *legacy_op.Open
 	if oldApp.Isv == "" || oldApp.Isv == nullChar {
 		// builtin app
 		labels[builtinKey] = "true"
+		labels[constants.WorkspaceLabelKey] = constants.SystemWorkspace
 	} else {
 		labels[constants.WorkspaceLabelKey] = oldApp.Isv
 	}

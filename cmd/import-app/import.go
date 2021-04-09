@@ -16,6 +16,7 @@ import (
 	"kubesphere.io/openpitrix-jobs/pkg/s3"
 	"os"
 	"path"
+	"strings"
 )
 
 var builtinKey = "application.kubesphere.io/builtin-app"
@@ -91,8 +92,44 @@ var _ importInterface = &ImportWorkFlow{}
 
 type importInterface interface {
 	CreateApp(ctx context.Context, chrt *chart.Chart) (*v1alpha1.HelmApplication, error)
+	CreateCategory(ctx context.Context, name string) (*v1alpha1.HelmCategory, error)
 	CreateAppVer(ctx context.Context, app *v1alpha1.HelmApplication, chartFileName string) (*v1alpha1.HelmApplicationVersion, error)
 	UpdateAppVersionStatus(ctx context.Context, appVer *v1alpha1.HelmApplicationVersion) (*v1alpha1.HelmApplicationVersion, error)
+}
+
+// CreateCategory if create a helm category if category not exists, or it will return that category
+func (wf *ImportWorkFlow) CreateCategory(ctx context.Context, name string) (ctg *v1alpha1.HelmCategory, err error) {
+	allCtg, err := wf.client.HelmCategories().List(ctx, metav1.ListOptions{
+		LabelSelector: labels.Everything().String(),
+	})
+	if err != nil {
+		klog.Errorf("get all category failed")
+		return nil, err
+	}
+
+	for ind := range allCtg.Items {
+		if allCtg.Items[ind].Spec.Name == name {
+			return &allCtg.Items[ind], nil
+		}
+	}
+
+	ctgId := idutils.GetUuid36(v1alpha1.HelmCategoryIdPrefix)
+
+	// create helm category
+	ctg = &v1alpha1.HelmCategory{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: ctgId,
+			Annotations: map[string]string{
+				constants.CreatorAnnotationKey: "admin",
+			},
+		},
+		Spec: v1alpha1.HelmCategorySpec{
+			Name:        name,
+			Description: "documentation",
+		},
+	}
+
+	return wf.client.HelmCategories().Create(ctx, ctg, metav1.CreateOptions{})
 }
 
 func (wf *ImportWorkFlow) CreateApp(ctx context.Context, chrt *chart.Chart) (app *v1alpha1.HelmApplication, err error) {
@@ -113,15 +150,34 @@ func (wf *ImportWorkFlow) CreateApp(ctx context.Context, chrt *chart.Chart) (app
 		}
 	}
 
+	// create category if need
+	var ctgName string
+	if chrt.Metadata.Annotations != nil && chrt.Metadata.Annotations[constants.CategoryKeyInChart] != "" {
+		ctgName = strings.TrimSpace(chrt.Metadata.Annotations[constants.CategoryKeyInChart])
+	}
+
+	var ctg *v1alpha1.HelmCategory
+	if ctgName != "" {
+		ctg, err = wf.CreateCategory(context.TODO(), ctgName)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	appId := idutils.GetUuid36(v1alpha1.HelmApplicationIdPrefix)
+	label := map[string]string{
+		builtinKey:                  "true",
+		constants.WorkspaceLabelKey: constants.SystemWorkspace,
+	}
+	if ctg != nil {
+		label[constants.CategoryIdLabelKey] = ctg.Name
+	}
 
 	// create helm application
 	app = &v1alpha1.HelmApplication{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: appId,
-			Labels: map[string]string{
-				builtinKey: "true",
-			},
+			Name:   appId,
+			Labels: label,
 			Annotations: map[string]string{
 				constants.CreatorAnnotationKey: "admin",
 			},
