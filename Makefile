@@ -18,7 +18,7 @@ clientset:
 
 
 openpitrix-jobs: fmt
-	docker build . -t openpitrix-jobs:latest
+	docker build . -t openpitrix-jobs:latest --build-arg BUILDDATE=$$(date +%s)
 
 mod-vendor:
 	go mod vendor

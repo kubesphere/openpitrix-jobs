@@ -16,7 +16,10 @@ FROM alpine:3.7
 RUN apk add --update ca-certificates && update-ca-certificates
 
 WORKDIR /root
+COPY --from=builder /release_bin/* /usr/local/bin/
+
+# Disable cache, always download chart package
+ARG BUILDDATE
+RUN echo "$BUILDDATE"
 COPY urls.txt /root
 RUN mkdir -p package && cp urls.txt package  && cd /root/package && for pkg in $(cat urls.txt); do wget $pkg; done && rm urls.txt
-
-COPY --from=builder /release_bin/* /usr/local/bin/
