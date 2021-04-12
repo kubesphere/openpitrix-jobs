@@ -16,6 +16,7 @@ FROM alpine:3.7
 RUN apk add --update ca-certificates && update-ca-certificates
 
 WORKDIR /root
+COPY import-config.yaml kubesphere/
 COPY --from=builder /release_bin/* /usr/local/bin/
 
 # Disable cache, always download chart package
