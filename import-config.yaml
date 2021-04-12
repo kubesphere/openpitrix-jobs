@@ -1,0 +1,7 @@
+# map category name to icon
+categoryIcon:
+  "Big Data": "ai"
+  "Storage": nodes
+  "Database": linechart
+  "HTTP Service": "ip"
+  "Container": "cluster"

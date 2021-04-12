@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,18 +27,29 @@ var (
 	InvalidScheme = errors.New("invalid scheme")
 )
 
+const (
+	// DefaultConfigurationPath the default location of the configuration file
+	defaultConfigurationPath = "/root/kubesphere"
+)
+
 func newImportCmd() *cobra.Command {
+
 	cmd := &cobra.Command{
 		Use:   "import",
 		Short: "import app",
 		Run: func(cmd *cobra.Command, args []string) {
+			importConfig, err := tryLoadImportConfig()
+			if err != nil {
+				klog.Fatalf("parse import config failed, error: %s", err)
+			}
 			s3Client, err := s3.NewS3Client(s3Options)
 			if err != nil {
 
 			}
 			wf := &ImportWorkFlow{
-				client:   versionedClient.ApplicationV1alpha1(),
-				s3Cleint: s3Client,
+				client:       versionedClient.ApplicationV1alpha1(),
+				s3Cleint:     s3Client,
+				importConfig: importConfig,
 			}
 
 			file, err := os.Open(chartDir)
@@ -84,8 +97,9 @@ func newImportCmd() *cobra.Command {
 }
 
 type ImportWorkFlow struct {
-	client   typedv1alpha1.ApplicationV1alpha1Interface
-	s3Cleint s3.Interface
+	client       typedv1alpha1.ApplicationV1alpha1Interface
+	s3Cleint     s3.Interface
+	importConfig *ImportConfig
 }
 
 var _ importInterface = &ImportWorkFlow{}
@@ -115,6 +129,11 @@ func (wf *ImportWorkFlow) CreateCategory(ctx context.Context, name string) (ctg 
 
 	ctgId := idutils.GetUuid36(v1alpha1.HelmCategoryIdPrefix)
 
+	desc := wf.importConfig.GetIcon(name)
+	if desc == "" {
+		desc = "documentation"
+	}
+
 	// create helm category
 	ctg = &v1alpha1.HelmCategory{
 		ObjectMeta: metav1.ObjectMeta{
@@ -125,7 +144,7 @@ func (wf *ImportWorkFlow) CreateCategory(ctx context.Context, name string) (ctg 
 		},
 		Spec: v1alpha1.HelmCategorySpec{
 			Name:        name,
-			Description: "documentation",
+			Description: desc,
 		},
 	}
 
@@ -313,4 +332,42 @@ func (wf *ImportWorkFlow) UpdateAppVersionStatus(ctx context.Context, appVer *v1
 	}
 
 	return appVer, nil
+}
+
+type ImportConfig struct {
+	// map category name to icon
+	CategoryIcon map[string]string `yaml:"categoryIcon"`
+}
+
+func (ic *ImportConfig) GetIcon(ctg string) string {
+	if len(ic.CategoryIcon) == 0 {
+		return ""
+	}
+
+	// viper is case-insensitive
+	return ic.CategoryIcon[strings.ToLower(ctg)]
+}
+
+func tryLoadImportConfig() (*ImportConfig, error) {
+	viper.SetConfigName("import-config")
+	viper.AddConfigPath(defaultConfigurationPath)
+
+	// Load from current working directory, only used for debugging
+	viper.AddConfigPath(".")
+
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			return nil, err
+		} else {
+			return nil, fmt.Errorf("error parsing configuration file %s", err)
+		}
+	}
+
+	conf := &ImportConfig{}
+
+	if err := viper.Unmarshal(conf); err != nil {
+		return nil, err
+	}
+
+	return conf, nil
 }
