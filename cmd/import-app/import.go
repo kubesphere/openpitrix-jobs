@@ -44,7 +44,7 @@ func newImportCmd() *cobra.Command {
 			}
 			s3Client, err := s3.NewS3Client(s3Options)
 			if err != nil {
-
+				klog.Fatalf("create s3 client failed, error: %s", err)
 			}
 			wf := &ImportWorkFlow{
 				client:       versionedClient.ApplicationV1alpha1(),
@@ -65,6 +65,10 @@ func newImportCmd() *cobra.Command {
 
 			for _, fileInfo := range fileList {
 				if fileInfo.IsDir() {
+					continue
+				}
+				if !strings.HasSuffix(fileInfo.Name(), ".tgz") {
+					klog.Infof("skip file %s", fileInfo.Name())
 					continue
 				}
 
@@ -113,6 +117,7 @@ type importInterface interface {
 
 // CreateCategory if create a helm category if category not exists, or it will return that category
 func (wf *ImportWorkFlow) CreateCategory(ctx context.Context, name string) (ctg *v1alpha1.HelmCategory, err error) {
+	klog.Infof("create category, name: %s", name)
 	allCtg, err := wf.client.HelmCategories().List(ctx, metav1.ListOptions{
 		LabelSelector: labels.Everything().String(),
 	})
@@ -134,6 +139,7 @@ func (wf *ImportWorkFlow) CreateCategory(ctx context.Context, name string) (ctg 
 		desc = "documentation"
 	}
 
+	klog.Infof("create category, name: %s, icon: %s", name, desc)
 	// create helm category
 	ctg = &v1alpha1.HelmCategory{
 		ObjectMeta: metav1.ObjectMeta{
@@ -152,6 +158,7 @@ func (wf *ImportWorkFlow) CreateCategory(ctx context.Context, name string) (ctg 
 }
 
 func (wf *ImportWorkFlow) CreateApp(ctx context.Context, chrt *chart.Chart) (app *v1alpha1.HelmApplication, err error) {
+	klog.Infof("start to create app, chart name: %s, version: %s", chrt.Name(), chrt.Metadata.Version)
 	appList, err := wf.client.HelmApplications().List(ctx, metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(map[string]string{builtinKey: "true"}).String(),
 	})
@@ -164,7 +171,7 @@ func (wf *ImportWorkFlow) CreateApp(ctx context.Context, chrt *chart.Chart) (app
 	for ind := range appList.Items {
 		item := &appList.Items[ind]
 		if item.GetTrueName() == chrt.Name() {
-			klog.Infof("helm application exists, id: %s", item.Name)
+			klog.Infof("helm application exists, name: %s, version: %s", chrt.Name(), chrt.Metadata.Version)
 			return item, nil
 		}
 	}
@@ -212,14 +219,13 @@ func (wf *ImportWorkFlow) CreateApp(ctx context.Context, chrt *chart.Chart) (app
 }
 
 func (wf *ImportWorkFlow) CreateAppVer(ctx context.Context, app *v1alpha1.HelmApplication, chartFileName string) (*v1alpha1.HelmApplicationVersion, error) {
-
 	chrt, err := loader.LoadFile(chartFileName)
-
 	if err != nil {
 		klog.Fatalf("load chart data failed failed, error: %s", err)
 		return nil, err
 	}
 
+	klog.Infof("start to create app version, chart name: %s, version: %s", chrt.Name(), chrt.Metadata.Version)
 	chartFile, _ := os.Open(chartFileName)
 
 	appVerList, err := wf.client.HelmApplicationVersions().List(ctx, metav1.ListOptions{
@@ -236,7 +242,7 @@ func (wf *ImportWorkFlow) CreateAppVer(ctx context.Context, app *v1alpha1.HelmAp
 	for ind := range appVerList.Items {
 		existsAppVer = &appVerList.Items[ind]
 		if existsAppVer.GetChartVersion() == chrt.Metadata.Version {
-			klog.Infof("helm application version exists, id: %s", existsAppVer.Name)
+			klog.Infof("helm application version exists, name: %s, version: %s", existsAppVer.GetTrueName(), existsAppVer.GetChartVersion())
 			if existsAppVer.Spec.DataKey == "" && existsAppVer.Status.State == v1alpha1.StateActive {
 				return existsAppVer, nil
 			} else {
@@ -245,16 +251,16 @@ func (wf *ImportWorkFlow) CreateAppVer(ctx context.Context, app *v1alpha1.HelmAp
 		}
 	}
 
-	var appId string
+	var appVerId string
 	if existsAppVer == nil {
-		appId = idutils.GetUuid36(v1alpha1.HelmApplicationVersionIdPrefix)
+		appVerId = idutils.GetUuid36(v1alpha1.HelmApplicationVersionIdPrefix)
 	} else {
-		appId = existsAppVer.Name
+		appVerId = existsAppVer.Name
 	}
 
 	// upload chart data
 	if existsAppVer == nil || existsAppVer.Spec.DataKey == "" {
-		err = wf.s3Cleint.Upload(path.Join(app.GetWorkspace(), appId), appId, chartFile)
+		err = wf.s3Cleint.Upload(path.Join(app.GetWorkspace(), appVerId), appVerId, chartFile)
 		if err != nil {
 			return nil, err
 		}
@@ -264,9 +270,10 @@ func (wf *ImportWorkFlow) CreateAppVer(ctx context.Context, app *v1alpha1.HelmAp
 	if existsAppVer == nil {
 		appVer := &v1alpha1.HelmApplicationVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: appId,
+				Name: appVerId,
 				Labels: map[string]string{
-					constants.ChartApplicationIdLabelKey: app.Name,
+					constants.ChartApplicationIdLabelKey: app.GetHelmApplicationId(),
+					constants.WorkspaceLabelKey:          app.GetWorkspace(),
 				},
 				Annotations: map[string]string{
 					constants.CreatorAnnotationKey: "admin",
@@ -286,22 +293,25 @@ func (wf *ImportWorkFlow) CreateAppVer(ctx context.Context, app *v1alpha1.HelmAp
 					Version:    chrt.Metadata.Version,
 					AppVersion: chrt.Metadata.AppVersion,
 				},
-				DataKey: appId,
+				DataKey: appVerId,
 			},
 		}
 
 		appVer, err = wf.client.HelmApplicationVersions().Create(ctx, appVer, metav1.CreateOptions{})
 		if err != nil {
+			klog.Errorf("create helm application version %s failed, error: %s", appVerId, err)
 			return nil, err
 		}
+		klog.Infof("create helm application version %s success", appVerId)
 		existsAppVer = appVer
 	}
 
-	// update app version status
+	// update app version status, set state to active
 	return wf.UpdateAppVersionStatus(ctx, existsAppVer)
 }
 
 func (wf *ImportWorkFlow) UpdateAppVersionStatus(ctx context.Context, appVer *v1alpha1.HelmApplicationVersion) (*v1alpha1.HelmApplicationVersion, error) {
+	klog.Infof("update app version status, chart name: %s, version: %s", appVer.GetTrueName(), appVer.GetChartVersion())
 	if appVer.Status.State == v1alpha1.StateActive {
 		return appVer, nil
 	}

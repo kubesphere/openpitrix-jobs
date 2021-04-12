@@ -412,6 +412,7 @@ func (cw *ConvertWorkflow) createApp(ctx context.Context, oldApp *legacy_op.Open
 	}
 
 	// upload icon and attachments if exists
+	klog.Infof("upload attachment for app %s", oldApp.AppID)
 	icon, attachments := cw.uploadAttachments(oldApp)
 
 	appId := strings.ToLower(oldApp.AppID)
