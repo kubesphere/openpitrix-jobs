@@ -500,6 +500,7 @@ func parseChartVersionName(name string) (version, appVersion string) {
 	return
 }
 
+// parse chart name and version from package name
 func (cw *ConvertWorkflow) getChartInfo(oldAppVer *legacy_op.OpenpitrixAppVersion) (name, version, appVersion string) {
 	if strings.HasPrefix(oldAppVer.PackageName, "att-") {
 		chrt, err := cw.loadVersionAttachment(oldAppVer.PackageName)
@@ -514,7 +515,7 @@ func (cw *ConvertWorkflow) getChartInfo(oldAppVer *legacy_op.OpenpitrixAppVersio
 		namePart := parts[len(parts)-1]
 		nameInd := strings.Index(namePart, ver)
 		if nameInd > 0 {
-			return namePart[0:nameInd], ver, appVer
+			return namePart[0 : nameInd-1], ver, appVer
 		}
 	}
 
