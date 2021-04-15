@@ -1,7 +1,10 @@
 # map category name to icon
 categoryIcon:
-  "Big Data": "ai"
-  "Storage": nodes
-  "Database": linechart
-  "HTTP Service": "ip"
-  "Container": "cluster"
+  "Database & Cache": "column"
+  "Prometheus Exporter": "cluster"
+  "Networking": "router"
+  "Storage": "storage"
+  "Image Registry": "cdn"
+  "Big Data": "increase"
+  "Message Queueing": "blockchain"
+  "Web Server": "ip"
