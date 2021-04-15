@@ -59,11 +59,13 @@ func newConvertCmd() *cobra.Command {
 			cw := &ConvertWorkflow{
 				s3Client:  s3Client,
 				appClient: versionedClient.ApplicationV1alpha1(),
-				//clusterClient: versionedClient.
 				k8sClient: k8sClient,
 				legacyDir: legacyDir,
 			}
 			cw.multiClusterEnabled = multiClusterEnabled
+			if cw.multiClusterEnabled {
+				cw.clusterClient = versionedClient.ClusterV1alpha1().Clusters()
+			}
 
 			// 1. load legacy data
 			err = cw.LoadAllData()
@@ -141,7 +143,7 @@ type ConvertWorkflow struct {
 func (cw *ConvertWorkflow) LoadAllData() error {
 	err := cw.loadApps()
 	if err != nil {
-		klog.Errorf("load apps failed, error: %s", err)
+		klog.Fatalf("load apps failed, error: %s", err)
 		return err
 	} else {
 		klog.Infof("load apps success")
@@ -500,6 +502,7 @@ func parseChartVersionName(name string) (version, appVersion string) {
 	return
 }
 
+// parse chart name and version from package name
 func (cw *ConvertWorkflow) getChartInfo(oldAppVer *legacy_op.OpenpitrixAppVersion) (name, version, appVersion string) {
 	if strings.HasPrefix(oldAppVer.PackageName, "att-") {
 		chrt, err := cw.loadVersionAttachment(oldAppVer.PackageName)
@@ -514,7 +517,7 @@ func (cw *ConvertWorkflow) getChartInfo(oldAppVer *legacy_op.OpenpitrixAppVersio
 		namePart := parts[len(parts)-1]
 		nameInd := strings.Index(namePart, ver)
 		if nameInd > 0 {
-			return namePart[0:nameInd], ver, appVer
+			return namePart[0 : nameInd-1], ver, appVer
 		}
 	}
 
@@ -658,7 +661,8 @@ func (cw *ConvertWorkflow) getWorkspace(ctx context.Context, cluster, ns string)
 	if cw.multiClusterEnabled {
 		clusterInstance, err := cw.clusterClient.Get(ctx, cluster, metav1.GetOptions{})
 		if err != nil {
-			return "", nil
+			klog.Infof("get cluster %s failed, error: %s", err)
+			return "", err
 		}
 
 		var client kubernetes.Interface
@@ -717,6 +721,7 @@ func (cw *ConvertWorkflow) CreateReleases(ctx context.Context) error {
 
 		ws, err := cw.getWorkspace(ctx, oldCluster.RuntimeID, oldCluster.Zone)
 		if err != nil {
+			klog.Warningf("get workspace for cluster %s failed, error: %s, continue", oldCluster.RuntimeID, err)
 			continue
 		}
 		labels[constants.WorkspaceLabelKey] = ws
