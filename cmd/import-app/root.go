@@ -9,6 +9,7 @@ import (
 	"kubesphere.io/openpitrix-jobs/pkg/client/clientset/versioned"
 	"kubesphere.io/openpitrix-jobs/pkg/s3"
 	"kubesphere.io/openpitrix-jobs/pkg/types"
+	"kubesphere.io/openpitrix-jobs/pkg/utils"
 )
 
 var kubeconfig string
@@ -26,6 +27,7 @@ func newRootCmd(out io.Writer, args []string) (*cobra.Command, error) {
 	}
 
 	cobra.OnInitialize(func() {
+		utils.DumpConfig()
 
 		ksConfig, err := types.TryLoadFromDisk()
 		if err != nil {
