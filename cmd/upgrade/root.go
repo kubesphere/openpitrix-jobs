@@ -10,6 +10,7 @@ import (
 	"io"
 	"kubesphere.io/openpitrix-jobs/pkg/s3"
 	"kubesphere.io/openpitrix-jobs/pkg/types"
+	"kubesphere.io/openpitrix-jobs/pkg/utils"
 	"os/exec"
 	"strings"
 
@@ -35,6 +36,7 @@ func newRootCmd(out io.Writer, args []string) (*cobra.Command, error) {
 		Use:   "upgrade",
 		Short: "parse kubesphere-config then start dump-all and convert app",
 		Run: func(cmd *cobra.Command, args []string) {
+			utils.DumpConfig()
 			config, err := types.TryLoadFromDisk()
 			if err != nil {
 				klog.Fatalf("load config failed, error: %s", err)
@@ -154,23 +156,4 @@ func createBucket(s3config *s3.Options) error {
 	}
 
 	return nil
-}
-
-func appendS3Param(args []string, config *types.Config) []string {
-	args = append(args,
-		fmt.Sprintf("--s3-endpoint=%s", config.OpenPitrixOptions.S3Options.Endpoint),
-		fmt.Sprintf("--s3-access-key-id=%s", config.OpenPitrixOptions.S3Options.AccessKeyID),
-		fmt.Sprintf("--s3-bucket=%s", config.OpenPitrixOptions.S3Options.Bucket),
-		fmt.Sprintf("--s3-disable-SSL=%t", config.OpenPitrixOptions.S3Options.DisableSSL),
-		fmt.Sprintf("--s3-force-path-style=%t", config.OpenPitrixOptions.S3Options.ForcePathStyle),
-		fmt.Sprintf("--s3-secret-access-key=%s", config.OpenPitrixOptions.S3Options.SecretAccessKey))
-
-	if config.OpenPitrixOptions.S3Options.Region != "" {
-		args = append(args, fmt.Sprintf("--s3-region=%s", config.OpenPitrixOptions.S3Options.Region))
-	}
-	if config.OpenPitrixOptions.S3Options.SessionToken != "" {
-		args = append(args, fmt.Sprintf("--s3-session-token=%s", config.OpenPitrixOptions.S3Options.SessionToken))
-	}
-
-	return args
 }
