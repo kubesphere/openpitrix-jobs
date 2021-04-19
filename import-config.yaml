@@ -1,7 +1,7 @@
 # map category name to icon
 categoryIcon:
-  "Database & Cache": "column"
-  "Prometheus Exporter": "cluster"
+  "Database & Cache": "database"
+  "Prometheus Exporter": "export"
   "Networking": "router"
   "Storage": "storage"
   "Image Registry": "cdn"
