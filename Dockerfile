@@ -12,7 +12,7 @@ RUN CGO_ENABLED=0 GOBIN=/release_bin go install -mod=vendor -ldflags '-w -s'  ku
 RUN CGO_ENABLED=0 GOBIN=/release_bin go install -mod=vendor -ldflags '-w -s'  kubesphere.io/openpitrix-jobs/cmd/upgrade/...
 
 
-FROM alpine:3.7
+FROM alpine:3.11
 RUN apk add --update ca-certificates && update-ca-certificates
 
 WORKDIR /root
