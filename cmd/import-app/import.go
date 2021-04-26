@@ -240,13 +240,14 @@ func (wf *ImportWorkFlow) CreateAppVer(ctx context.Context, app *v1alpha1.HelmAp
 	var existsAppVer *v1alpha1.HelmApplicationVersion
 
 	for ind := range appVerList.Items {
-		existsAppVer = &appVerList.Items[ind]
-		if existsAppVer.GetChartVersion() == chrt.Metadata.Version {
-			klog.Infof("helm application version exists, name: %s, version: %s", existsAppVer.GetTrueName(), existsAppVer.GetChartVersion())
-			if existsAppVer.Spec.DataKey == "" && existsAppVer.Status.State == v1alpha1.StateActive {
+		curr := &appVerList.Items[ind]
+		if curr.GetChartVersion() == chrt.Metadata.Version {
+			klog.Infof("helm application version exists, name: %s, version: %s", curr.GetTrueName(), curr.GetChartVersion())
+			if curr.Spec.DataKey != "" && curr.Status.State == v1alpha1.StateActive {
 				return existsAppVer, nil
 			} else {
-				continue
+				existsAppVer = curr
+				break
 			}
 		}
 	}
