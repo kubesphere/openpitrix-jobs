@@ -53,7 +53,12 @@ func newRootCmd(out io.Writer, args []string) (*cobra.Command, error) {
 			}
 
 			if config.MySql == nil {
-				klog.Fatalf("mysql is empty", err)
+				klog.Warningf("mysql is empty, use the default config")
+				config.MySql = &types.MySqlOptions{
+					Host:     "mysql.kubesphere-system.svc:3306",
+					Password: "password",
+					Username: "root",
+				}
 			}
 
 			// 1. dump legacy data
