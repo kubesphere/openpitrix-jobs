@@ -34,6 +34,14 @@ func newRootCmd(out io.Writer, args []string) (*cobra.Command, error) {
 			klog.Fatalf("load config failed, error: %s", err)
 		}
 
+		if ksConfig.OpenPitrixOptions == nil {
+			klog.Fatalf("openpitrix config is empty, please wait a minute")
+		}
+
+		if ksConfig.OpenPitrixOptions.S3Options == nil {
+			klog.Fatalf("s3 config is empty, please wait a minute")
+		}
+
 		s3Options = ksConfig.OpenPitrixOptions.S3Options
 
 		config, err := clientcmd.BuildConfigFromFlags(master, kubeconfig)
