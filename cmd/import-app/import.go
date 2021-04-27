@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/viper"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
@@ -18,6 +19,7 @@ import (
 	"kubesphere.io/openpitrix-jobs/pkg/s3"
 	"os"
 	"path"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 )
 
@@ -170,9 +172,27 @@ func (wf *ImportWorkFlow) CreateApp(ctx context.Context, chrt *chart.Chart) (app
 
 	for ind := range appList.Items {
 		item := &appList.Items[ind]
-		if item.GetTrueName() == chrt.Name() {
+		if item.GetTrueName() == wf.importConfig.ReplaceAppName(chrt.Name()) {
 			klog.Infof("helm application exists, name: %s, version: %s", chrt.Name(), chrt.Metadata.Version)
+			err = wf.UpdateAppNameInStore(ctx, item, wf.importConfig.ReplaceAppName(chrt.Name()))
+			if err != nil {
+				return nil, err
+			}
 			return item, nil
+		} else if item.GetTrueName() == chrt.Name() {
+			// we need update app name
+			klog.Infof("chart name: %s, replace name: %s", chrt.Name(), wf.importConfig.ReplaceAppName(chrt.Name()))
+			app, err := wf.UpdateAppName(ctx, item, wf.importConfig.ReplaceAppName(chrt.Name()))
+			if err != nil {
+				return nil, err
+			}
+			// update app name in store
+			err = wf.UpdateAppNameInStore(ctx, item, wf.importConfig.ReplaceAppName(chrt.Name()))
+			if err == nil {
+				return app, err
+			} else {
+				return nil, err
+			}
 		}
 	}
 
@@ -209,7 +229,7 @@ func (wf *ImportWorkFlow) CreateApp(ctx context.Context, chrt *chart.Chart) (app
 			},
 		},
 		Spec: v1alpha1.HelmApplicationSpec{
-			Name:        chrt.Name(),
+			Name:        wf.importConfig.ReplaceAppName(chrt.Name()),
 			Description: chrt.Metadata.Description,
 			Icon:        chrt.Metadata.Icon,
 		},
@@ -311,6 +331,55 @@ func (wf *ImportWorkFlow) CreateAppVer(ctx context.Context, app *v1alpha1.HelmAp
 	return wf.UpdateAppVersionStatus(ctx, existsAppVer)
 }
 
+func (wf *ImportWorkFlow) UpdateAppNameInStore(ctx context.Context, app *v1alpha1.HelmApplication, name string) (err error) {
+	appId := fmt.Sprintf("%s-%s", app.Name, "store")
+
+	appInStore, err := wf.client.HelmApplications().Get(ctx, appId, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	if appInStore.Spec.Name == name {
+		return nil
+	}
+
+	appInStore, err = wf.UpdateAppName(ctx, appInStore, name)
+	return err
+}
+
+func (wf *ImportWorkFlow) UpdateAppName(ctx context.Context, oldApp *v1alpha1.HelmApplication, name string) (*v1alpha1.HelmApplication, error) {
+	if oldApp.Spec.Name == name {
+		return oldApp, nil
+	}
+	appId := oldApp.Name
+
+	for i := 0; i < 10; i++ {
+		patch := client.MergeFrom(oldApp)
+		newApp := oldApp.DeepCopy()
+		newApp.Spec.Name = name
+		data, err := patch.Data(newApp)
+		if err != nil {
+			return nil, err
+		}
+
+		newApp, err = wf.client.HelmApplications().Patch(ctx, oldApp.Name, patch.Type(), data, metav1.PatchOptions{})
+		if err != nil {
+			klog.Errorf("update app name %s failed, retry: %d, error: %s", oldApp.Name, i, err)
+		} else {
+			klog.Errorf("update app version %s status success", oldApp.Name)
+			return newApp, nil
+		}
+
+		// get the exist app
+		oldApp, err = wf.client.HelmApplications().Get(ctx, appId, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+	}
+
+	return nil, errors.New("update app name failed")
+}
+
 func (wf *ImportWorkFlow) UpdateAppVersionStatus(ctx context.Context, appVer *v1alpha1.HelmApplicationVersion) (*v1alpha1.HelmApplicationVersion, error) {
 	klog.Infof("update app version status, chart name: %s, version: %s", appVer.GetTrueName(), appVer.GetChartVersion())
 	if appVer.Status.State == v1alpha1.StateActive {
@@ -347,7 +416,20 @@ func (wf *ImportWorkFlow) UpdateAppVersionStatus(ctx context.Context, appVer *v1
 
 type ImportConfig struct {
 	// map category name to icon
-	CategoryIcon map[string]string `yaml:"categoryIcon"`
+	CategoryIcon   map[string]string `yaml:"categoryIcon"`
+	AppNameReplace map[string]string `yaml:"appNameReplace"`
+}
+
+func (ic *ImportConfig) ReplaceAppName(oldName string) string {
+	if len(ic.AppNameReplace) == 0 {
+		return oldName
+	}
+
+	if newName, exists := ic.AppNameReplace[oldName]; exists {
+		return newName
+	} else {
+		return oldName
+	}
 }
 
 func (ic *ImportConfig) GetIcon(ctg string) string {
