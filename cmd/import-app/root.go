@@ -10,6 +10,8 @@ import (
 	"kubesphere.io/openpitrix-jobs/pkg/s3"
 	"kubesphere.io/openpitrix-jobs/pkg/types"
 	"kubesphere.io/openpitrix-jobs/pkg/utils"
+	"os"
+	"time"
 )
 
 var kubeconfig string
@@ -27,19 +29,32 @@ func newRootCmd(out io.Writer, args []string) (*cobra.Command, error) {
 	}
 
 	cobra.OnInitialize(func() {
-		utils.DumpConfig()
+		var ksConfig *types.Config
+		var err error
 
-		ksConfig, err := types.TryLoadFromDisk()
-		if err != nil {
-			klog.Fatalf("load config failed, error: %s", err)
-		}
+		// https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#mounted-configmaps-are-updated-automatically
+		// Mounted ConfigMaps are updated automatically
+		retry := 100
+		for i := 0; ; i++ {
+			if i == retry {
+				klog.Errorf("load openpitrix config failed")
+				os.Exit(1)
+			}
+			utils.DumpConfig()
+			ksConfig, err = types.TryLoadFromDisk()
+			if err != nil {
+				klog.Errorf("load config failed, error: %s", err)
+			} else {
+				if ksConfig.OpenPitrixOptions == nil {
+					klog.Errorf("openpitrix config is empty, please wait a minute")
+				} else if ksConfig.OpenPitrixOptions.S3Options == nil {
+					klog.Errorf("openpitrix s3 config is empty, please wait a minute")
+				} else {
+					break
+				}
+			}
 
-		if ksConfig.OpenPitrixOptions == nil {
-			klog.Fatalf("openpitrix config is empty, please wait a minute")
-		}
-
-		if ksConfig.OpenPitrixOptions.S3Options == nil {
-			klog.Fatalf("s3 config is empty, please wait a minute")
+			time.Sleep(5 * time.Second)
 		}
 
 		s3Options = ksConfig.OpenPitrixOptions.S3Options
