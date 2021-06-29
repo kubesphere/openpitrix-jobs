@@ -172,22 +172,22 @@ func (wf *ImportWorkFlow) CreateApp(ctx context.Context, chrt *chart.Chart) (app
 
 	for ind := range appList.Items {
 		item := &appList.Items[ind]
-		if item.GetTrueName() == wf.importConfig.ReplaceAppName(chrt.Name()) {
+		if item.GetTrueName() == wf.importConfig.ReplaceAppName(chrt) {
 			klog.Infof("helm application exists, name: %s, version: %s", chrt.Name(), chrt.Metadata.Version)
-			err = wf.UpdateAppNameInStore(ctx, item, wf.importConfig.ReplaceAppName(chrt.Name()))
+			err = wf.UpdateAppNameInStore(ctx, item, wf.importConfig.ReplaceAppName(chrt))
 			if err != nil {
 				return nil, err
 			}
 			return item, nil
 		} else if item.GetTrueName() == chrt.Name() {
 			// we need update app name
-			klog.Infof("chart name: %s, replace name: %s", chrt.Name(), wf.importConfig.ReplaceAppName(chrt.Name()))
-			app, err := wf.UpdateAppName(ctx, item, wf.importConfig.ReplaceAppName(chrt.Name()))
+			klog.Infof("chart name: %s, replace name: %s", chrt.Name(), wf.importConfig.ReplaceAppName(chrt))
+			app, err := wf.UpdateAppName(ctx, item, wf.importConfig.ReplaceAppName(chrt))
 			if err != nil {
 				return nil, err
 			}
 			// update app name in store
-			err = wf.UpdateAppNameInStore(ctx, item, wf.importConfig.ReplaceAppName(chrt.Name()))
+			err = wf.UpdateAppNameInStore(ctx, item, wf.importConfig.ReplaceAppName(chrt))
 			if err == nil {
 				return app, err
 			} else {
@@ -229,7 +229,7 @@ func (wf *ImportWorkFlow) CreateApp(ctx context.Context, chrt *chart.Chart) (app
 			},
 		},
 		Spec: v1alpha1.HelmApplicationSpec{
-			Name:        wf.importConfig.ReplaceAppName(chrt.Name()),
+			Name:        wf.importConfig.ReplaceAppName(chrt),
 			Description: chrt.Metadata.Description,
 			Icon:        chrt.Metadata.Icon,
 		},
@@ -420,15 +420,16 @@ type ImportConfig struct {
 	AppNameReplace map[string]string `yaml:"appNameReplace"`
 }
 
-func (ic *ImportConfig) ReplaceAppName(oldName string) string {
-	if len(ic.AppNameReplace) == 0 {
-		return oldName
-	}
-
-	if newName, exists := ic.AppNameReplace[oldName]; exists {
+func (ic *ImportConfig) ReplaceAppName(chrt *chart.Chart) string {
+	// import-config.yaml comes first
+	if newName, exists := ic.AppNameReplace[chrt.Name()]; exists {
 		return newName
 	} else {
-		return oldName
+		// If app.kubesphere.io/display-name exists in chart's annotation, use this value.
+		if chrt.Metadata.Annotations != nil && chrt.Metadata.Annotations[constants.ChartDisplayName] != "" {
+			return strings.TrimSpace(chrt.Metadata.Annotations[constants.ChartDisplayName])
+		}
+		return chrt.Name()
 	}
 }
 

@@ -18,6 +18,7 @@ package constants
 
 const (
 	CategoryKeyInChart                = "app.kubesphere.io/category"
+	ChartDisplayName                  = "app.kubesphere.io/display-name"
 	ClusterNameLabelKey               = "kubesphere.io/cluster"
 	WorkspaceLabelKey                 = "kubesphere.io/workspace"
 	NamespaceLabelKey                 = "kubesphere.io/namespace"
