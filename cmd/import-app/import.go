@@ -310,9 +310,14 @@ func (wf *ImportWorkFlow) CreateAppVer(ctx context.Context, app *v1alpha1.HelmAp
 			},
 			Spec: v1alpha1.HelmApplicationVersionSpec{
 				Metadata: &v1alpha1.Metadata{
-					Name:       chrt.Name(),
-					Version:    chrt.Metadata.Version,
-					AppVersion: chrt.Metadata.AppVersion,
+					Name:        chrt.Name(),
+					Version:     chrt.Metadata.Version,
+					AppVersion:  chrt.Metadata.AppVersion,
+					Icon:        chrt.Metadata.Icon,
+					Home:        chrt.Metadata.Home,
+					Sources:     chrt.Metadata.Sources,
+					Maintainers: translateMaintainers(chrt.Metadata.Maintainers),
+					Keywords:    chrt.Metadata.Keywords,
 				},
 				DataKey: appVerId,
 			},
@@ -329,6 +334,19 @@ func (wf *ImportWorkFlow) CreateAppVer(ctx context.Context, app *v1alpha1.HelmAp
 
 	// update app version status, set state to active
 	return wf.UpdateAppVersionStatus(ctx, existsAppVer)
+}
+
+func translateMaintainers(mt []*chart.Maintainer) []*v1alpha1.Maintainer {
+	ret := make([]*v1alpha1.Maintainer, 0, len(mt))
+	for _, value := range mt {
+		ret = append(ret, &v1alpha1.Maintainer{
+			Name:  value.Name,
+			Email: value.Email,
+			URL:   value.URL,
+		})
+	}
+
+	return ret
 }
 
 func (wf *ImportWorkFlow) UpdateAppNameInStore(ctx context.Context, app *v1alpha1.HelmApplication, name string) (err error) {
