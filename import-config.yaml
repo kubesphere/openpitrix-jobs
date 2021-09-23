@@ -8,6 +8,7 @@ categoryIcon:
   "Big Data": "increase"
   "Message Queueing": "blockchain"
   "Web Server": "ip"
+  "Infrastructure": "nodes"
 appNameReplace:
   "elasticsearch-exporter": "Elasticsearch Exporter"
   "harbor": "Harbor"
