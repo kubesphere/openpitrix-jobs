@@ -13,7 +13,7 @@ RUN CGO_ENABLED=0 GOBIN=/release_bin go install -mod=vendor -ldflags '-w -s'  ku
 
 
 FROM alpine:3.11
-RUN apk add --update ca-certificates && update-ca-certificates
+RUN apk add --update ca-certificates wget && update-ca-certificates
 
 WORKDIR /root
 COPY import-config.yaml kubesphere/
@@ -23,4 +23,4 @@ COPY --from=builder /release_bin/* /usr/local/bin/
 ARG BUILDDATE
 RUN echo "$BUILDDATE"
 COPY urls.txt /root
-RUN mkdir -p package && cp urls.txt package  && cd /root/package && for pkg in $(cat urls.txt); do wget $pkg; done && rm urls.txt
+RUN mkdir -p package && cp urls.txt package  && cd /root/package && for pkg in $(cat urls.txt); do wget --content-disposition $pkg; done && rm urls.txt
