@@ -13,5 +13,5 @@ https://charts.kubesphere.io/test/mongodb-0.3.2.tgz
 https://charts.kubesphere.io/test/postgresql-0.4.2.tgz
 https://charts.kubesphere.io/test/rabbitmq-0.3.2.tgz
 https://charts.kubesphere.io/test/redis-0.3.5.tgz
-https://charts.kubesphere.io/test/radondb-mysql-1.0.0.tgz
-https://charts.kubesphere.io/test/radondb-postgresql-1.0.1.tgz
+https://charts.kubesphere.io/test/radondb-mysql-1.0.1.tgz
+https://charts.kubesphere.io/test/radondb-postgresql-1.0.2.tgz
