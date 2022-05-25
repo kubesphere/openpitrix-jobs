@@ -14,7 +14,6 @@ import (
 	"io"
 	"math"
 	"sync"
-	"unicode"
 
 	"go.mongodb.org/mongo-driver/bson/bsontype"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -373,7 +372,8 @@ func (vr *valueReader) ReadBinary() (b []byte, btype byte, err error) {
 		return nil, 0, err
 	}
 
-	if btype == 0x02 {
+	// Check length in case it is an old binary without a length.
+	if btype == 0x02 && length > 4 {
 		length, err = vr.readLength()
 		if err != nil {
 			return nil, 0, err
@@ -384,9 +384,13 @@ func (vr *valueReader) ReadBinary() (b []byte, btype byte, err error) {
 	if err != nil {
 		return nil, 0, err
 	}
+	// Make a copy of the returned byte slice because it's just a subslice from the valueReader's
+	// buffer and is not safe to return in the unmarshaled value.
+	cp := make([]byte, len(b))
+	copy(cp, b)
 
 	vr.pop()
-	return b, btype, nil
+	return cp, btype, nil
 }
 
 func (vr *valueReader) ReadBoolean() (bool, error) {
@@ -448,6 +452,9 @@ func (vr *valueReader) ReadCodeWithScope() (code string, dr DocumentReader, err 
 	strLength, err := vr.readLength()
 	if err != nil {
 		return "", nil, err
+	}
+	if strLength <= 0 {
+		return "", nil, fmt.Errorf("invalid string length: %d", strLength)
 	}
 	strBytes, err := vr.readBytes(strLength)
 	if err != nil {
@@ -734,6 +741,9 @@ func (vr *valueReader) ReadValue() (ValueReader, error) {
 	return vr, nil
 }
 
+// readBytes reads length bytes from the valueReader starting at the current offset. Note that the
+// returned byte slice is a subslice from the valueReader buffer and must be converted or copied
+// before returning in an unmarshaled value.
 func (vr *valueReader) readBytes(length int32) ([]byte, error) {
 	if length < 0 {
 		return nil, fmt.Errorf("invalid length: %d", length)
@@ -745,6 +755,7 @@ func (vr *valueReader) readBytes(length int32) ([]byte, error) {
 
 	start := vr.offset
 	vr.offset += int64(length)
+
 	return vr.d[start : start+int64(length)], nil
 }
 
@@ -787,16 +798,6 @@ func (vr *valueReader) readCString() (string, error) {
 	return string(vr.d[start : start+int64(idx)]), nil
 }
 
-func (vr *valueReader) skipCString() error {
-	idx := bytes.IndexByte(vr.d[vr.offset:], 0x00)
-	if idx < 0 {
-		return io.EOF
-	}
-	// idx does not include the null byte
-	vr.offset += int64(idx) + 1
-	return nil
-}
-
 func (vr *valueReader) readString() (string, error) {
 	length, err := vr.readLength()
 	if err != nil {
@@ -817,14 +818,6 @@ func (vr *valueReader) readString() (string, error) {
 
 	start := vr.offset
 	vr.offset += int64(length)
-
-	if length == 2 {
-		asciiByte := vr.d[start]
-		if asciiByte > unicode.MaxASCII {
-			return "", fmt.Errorf("invalid ascii byte")
-		}
-	}
-
 	return string(vr.d[start : start+int64(length)-1]), nil
 }
 
