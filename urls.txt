@@ -1,5 +1,5 @@
 https://charts.kubesphere.io/main/elasticsearch-exporter-3.3.4.tgz
-https://charts.kubesphere.io/main/harbor-1.4.1.tgz
+https://charts.kubesphere.io/main/harbor-1.9.3.tgz
 https://charts.kubesphere.io/main/memcached-3.2.5.tgz
 https://charts.kubesphere.io/main/minio-6.0.5.tgz
 https://charts.kubesphere.io/main/mysql-1.6.8.tgz
