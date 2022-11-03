@@ -16,3 +16,4 @@ kubesphere.yaml
 # vendor/
 .idea/
 package/
+.vscode/

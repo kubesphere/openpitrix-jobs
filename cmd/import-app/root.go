@@ -1,8 +1,11 @@
 package main
 
 import (
-	"github.com/spf13/cobra"
 	"io"
+	"os"
+	"time"
+
+	"github.com/spf13/cobra"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
@@ -10,8 +13,6 @@ import (
 	"kubesphere.io/openpitrix-jobs/pkg/s3"
 	"kubesphere.io/openpitrix-jobs/pkg/types"
 	"kubesphere.io/openpitrix-jobs/pkg/utils"
-	"os"
-	"time"
 )
 
 var kubeconfig string

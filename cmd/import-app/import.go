@@ -4,6 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path"
+	"strings"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"helm.sh/helm/v3/pkg/chart"
@@ -17,10 +21,7 @@ import (
 	"kubesphere.io/openpitrix-jobs/pkg/constants"
 	"kubesphere.io/openpitrix-jobs/pkg/idutils"
 	"kubesphere.io/openpitrix-jobs/pkg/s3"
-	"os"
-	"path"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 )
 
 var builtinKey = "application.kubesphere.io/builtin-app"
@@ -329,6 +330,10 @@ func (wf *ImportWorkFlow) CreateAppVer(ctx context.Context, app *v1alpha1.HelmAp
 			return nil, err
 		}
 		klog.Infof("create helm application version %s success", appVerId)
+		appVer1, err := wf.client.HelmApplicationVersions().Get(ctx, appVer.Name, metav1.GetOptions{})
+		if err != nil {
+			klog.Errorf("get helm application version %s failed, error: %s", appVer1.Name, err)
+		}
 		existsAppVer = appVer
 	}
 
@@ -417,9 +422,14 @@ func (wf *ImportWorkFlow) UpdateAppVersionStatus(ctx context.Context, appVer *v1
 		name := appVer.Name
 		appVer, err = wf.client.HelmApplicationVersions().UpdateStatus(ctx, appVer, metav1.UpdateOptions{})
 		if err != nil {
-			klog.Errorf("update app version %s status failed, retry: %d, error: %s", name, i, err)
+			if apierrors.IsConflict(err) {
+				klog.Warningf("update app version %s status conflict, retry: %d", name, i)
+			} else {
+				klog.Errorf("update app version %s status failed, retry: %d, error: %s", name, i, err)
+				return nil, err
+			}
 		} else {
-			klog.Errorf("update app version %s status success", name)
+			klog.Infof("update app version %s status success", name)
 			return appVer, nil
 		}
 		appVer, err = wf.client.HelmApplicationVersions().Get(ctx, name, metav1.GetOptions{})
