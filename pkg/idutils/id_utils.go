@@ -18,14 +18,14 @@ package idutils
 
 import (
 	"errors"
+	"net"
+
 	"github.com/golang/example/stringutil"
 	"github.com/sony/sonyflake"
 	"github.com/speps/go-hashids"
-	"net"
 )
 
 var sf *sonyflake.Sonyflake
-var upperMachineID uint16
 
 func init() {
 	var st sonyflake.Settings
@@ -34,11 +34,18 @@ func init() {
 		sf = sonyflake.NewSonyflake(sonyflake.Settings{
 			MachineID: lower16BitIP,
 		})
-		upperMachineID, _ = upper16BitIP()
+	}
+	if sf == nil {
+		sf = sonyflake.NewSonyflake(sonyflake.Settings{
+			MachineID: lower16BitIPv6,
+		})
 	}
 }
 
 func GetIntId() uint64 {
+	if sf == nil {
+		panic(errors.New("invalid snowflake instance"))
+	}
 	id, err := sf.NextID()
 	if err != nil {
 		panic(err)
@@ -74,13 +81,12 @@ func lower16BitIP() (uint16, error) {
 	return uint16(ip[2])<<8 + uint16(ip[3]), nil
 }
 
-func upper16BitIP() (uint16, error) {
-	ip, err := IPv4()
+func lower16BitIPv6() (uint16, error) {
+	ip, err := IPv6()
 	if err != nil {
 		return 0, err
 	}
-
-	return uint16(ip[0])<<8 + uint16(ip[1]), nil
+	return uint16(ip[14])<<8 + uint16(ip[15]), nil
 }
 
 func IPv4() (net.IP, error) {
@@ -96,6 +102,30 @@ func IPv4() (net.IP, error) {
 		}
 
 		ip := ipnet.IP.To4()
+		if ip == nil {
+			continue
+		}
+		return ip, nil
+
+	}
+	return nil, errors.New("no ip address")
+}
+
+func IPv6() (net.IP, error) {
+	as, err := net.InterfaceAddrs()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, a := range as {
+		ipnet, ok := a.(*net.IPNet)
+		if !ok || ipnet.IP.IsLoopback() {
+			continue
+		}
+		if ipnet.IP.To4() != nil {
+			continue
+		}
+		ip := ipnet.IP.To16()
 		if ip == nil {
 			continue
 		}
