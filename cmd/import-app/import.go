@@ -330,10 +330,6 @@ func (wf *ImportWorkFlow) CreateAppVer(ctx context.Context, app *v1alpha1.HelmAp
 			return nil, err
 		}
 		klog.Infof("create helm application version %s success", appVerId)
-		appVer1, err := wf.client.HelmApplicationVersions().Get(ctx, appVer.Name, metav1.GetOptions{})
-		if err != nil {
-			klog.Errorf("get helm application version %s failed, error: %s", appVer1.Name, err)
-		}
 		existsAppVer = appVer
 	}
 
