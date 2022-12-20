@@ -17,6 +17,7 @@ limitations under the License.
 package s3
 
 import (
+	"errors"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -35,6 +36,7 @@ type Client struct {
 }
 
 func (s *Client) Upload(key, fileName string, body io.Reader) error {
+
 	uploader := s3manager.NewUploader(s.s3Session, func(uploader *s3manager.Uploader) {
 		uploader.LeavePartsOnError = true
 	})
@@ -107,8 +109,18 @@ func NewS3Client(options *Options) (Interface, error) {
 	c.s3Client = s3.New(s)
 	c.s3Session = s
 	c.bucket = options.Bucket
+	object, err := c.s3Client.ListBuckets(&s3.ListBucketsInput{})
+	if err != nil {
+		klog.Errorf("list bucket failed:%s", err)
+		return nil, err
+	}
+	for _, bucket := range object.Buckets {
+		if *bucket.Name == c.bucket {
+			return &c, nil
+		}
+	}
+	return nil, errors.New(fmt.Sprintf("bucket:%s not exist", options.Bucket))
 
-	return &c, nil
 }
 
 func (s *Client) Client() *s3.S3 {
