@@ -109,12 +109,12 @@ func NewS3Client(options *Options) (Interface, error) {
 	c.s3Client = s3.New(s)
 	c.s3Session = s
 	c.bucket = options.Bucket
-	object, err := c.s3Client.ListBuckets(&s3.ListBucketsInput{})
+	buckets, err := c.s3Client.ListBuckets(&s3.ListBucketsInput{})
 	if err != nil {
 		klog.Errorf("list bucket failed:%s", err)
 		return nil, err
 	}
-	for _, bucket := range object.Buckets {
+	for _, bucket := range buckets.Buckets {
 		if *bucket.Name == c.bucket {
 			return &c, nil
 		}
