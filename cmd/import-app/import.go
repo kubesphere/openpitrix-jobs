@@ -64,6 +64,7 @@ func newImportCmd() *cobra.Command {
 			fileList, err := file.Readdir(0)
 			if err != nil {
 				klog.Fatalf("read dir failed, error: %s", err)
+				os.Exit(0)
 			}
 
 			for _, fileInfo := range fileList {
@@ -88,6 +89,7 @@ func newImportCmd() *cobra.Command {
 				appVer, err := wf.CreateAppVer(context.TODO(), app, path.Join(chartDir, fileInfo.Name()))
 				if err != nil {
 					klog.Errorf("create app version failed, error: %s", err)
+
 				}
 				_ = appVer
 			}
@@ -233,6 +235,7 @@ func (wf *ImportWorkFlow) CreateApp(ctx context.Context, chrt *chart.Chart) (app
 			Name:        wf.importConfig.ReplaceAppName(chrt),
 			Description: chrt.Metadata.Description,
 			Icon:        chrt.Metadata.Icon,
+			AppHome:     chrt.Metadata.Home,
 		},
 	}
 
