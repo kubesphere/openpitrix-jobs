@@ -22,7 +22,7 @@ jobs:
         id: docker_meta
         uses: crazy-max/ghaction-docker-meta@v1
         with:
-          images: kubespheredev/openpitrix-jobs
+          images: kubesphere/openpitrix-jobs
           tag-sha: true
       -
         name: Set up QEMU
